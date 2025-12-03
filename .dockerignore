@@ -1,3 +1,8 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
 # Python
 __pycache__/
 *.py[cod]
@@ -7,18 +12,6 @@ __pycache__/
 env/
 venv/
 ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -28,7 +21,6 @@ wheels/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
@@ -37,15 +29,22 @@ Thumbs.db
 # Railway
 .railway/
 
+# Documentation and helper files
+*.md
+!README.md
+*.ps1
+push_to_github.md
+setup_github.ps1
+
+# Mise (prevent any mise detection)
+.mise/
+mise.toml
+.mise.toml
+
 # Logs
 *.log
 
 # Environment
 .env
 .env.local
-
-# Mise
-.mise/
-mise.toml
-.mise.toml
 
