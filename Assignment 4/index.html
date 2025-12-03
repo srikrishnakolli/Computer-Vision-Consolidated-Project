@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Assignment 4 · Panorama & SIFT</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero__content">
+        <p class="eyebrow">Computer Vision · Assignment 4</p>
+        <h1>Panorama Stitching + SIFT from Scratch</h1>
+        <p class="lead">
+          This single-page report showcases the two implementations delivered in
+          Assignment 4: an OpenCV panorama pipeline (Task&nbsp;1) and a custom
+          SIFT + RANSAC feature matcher (Task&nbsp;2). Use the buttons below to
+          explore the code, run commands, and review the generated artefacts.
+        </p>
+        <div class="hero__actions">
+          <button class="btn primary" data-scroll="#task1">View Task 1</button>
+          <button class="btn ghost" data-scroll="#task2">View Task 2</button>
+        </div>
+      </div>
+      <div class="hero__image">
+        <img src="output/task1_panorama1.jpg" alt="Panorama preview" />
+      </div>
+    </header>
+
+    <main>
+      <section id="overview" class="card">
+        <h2>Repository Overview</h2>
+        <div class="grid two">
+          <div>
+            <h3>Task 1 · Panorama Stitching</h3>
+            <p>
+              Implemented in <code>task1_stitch.py</code> using OpenCV's high-level
+              <code>Stitcher</code> class. Handles image loading, optional down-sampling,
+              exposure compensation, and mobile-versus-desktop comparisons.
+            </p>
+          </div>
+          <div>
+            <h3>Task 2 · SIFT + RANSAC</h3>
+            <p>
+              Implemented in <code>task2_sift.py</code>. Builds the Gaussian / DoG pyramid
+              manually, extracts descriptors, matches them via Lowe's ratio test, and
+              estimates homographies with a custom RANSAC loop&mdash;then compares against
+              OpenCV's reference SIFT implementation.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="task1" class="card">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Task 1</p>
+            <h2>Panorama Stitching (Python)</h2>
+          </div>
+          <div class="tags">
+            <span class="tag">OpenCV Stitcher</span>
+            <span class="tag">Exposure Compensation</span>
+            <span class="tag">CLI</span>
+          </div>
+        </div>
+        <p>
+          Run the command below to stitch the bundled captures or replace the
+          <code>--images</code> folder with your own photos (ensure 40&ndash;60% overlap
+          and ordered sweep).
+        </p>
+        <div class="command">
+          <pre><code id="cmd-task1">python task1_stitch.py \
+  --images ./images \
+  --pattern "*.JPG" \
+  --output ./output/task1_panorama1.jpg \
+  --reference ./comparisons/mobi_panaroma.JPG \
+  --comparison-output ./output/task1_vs_mobi.jpg</code></pre>
+          <button class="btn copy" data-copy="#cmd-task1">Copy</button>
+        </div>
+        <div class="gallery">
+          <figure>
+            <img src="images/IMG_02.JPG" alt="Input capture" />
+            <figcaption>Sample input frame</figcaption>
+          </figure>
+          <figure>
+            <img src="output/task1_panorama1.jpg" alt="Panorama output" />
+            <figcaption>Generated panorama</figcaption>
+          </figure>
+          <figure>
+            <img src="output/task1_vs_mobi.jpg" alt="Comparison" />
+            <figcaption>Desktop vs phone comparison</figcaption>
+          </figure>
+        </div>
+        <details>
+          <summary>Key implementation notes</summary>
+          <ul>
+            <li>
+              Automatic exposure compensation strategy is configurable via
+              <code>--exposure-compensation</code>.
+            </li>
+            <li>
+              Supports arbitrary glob patterns with <code>--pattern</code> to isolate
+              subsets of frames.
+            </li>
+            <li>
+              Comparison mode builds a side-by-side strip to facilitate the report's
+              qualitative analysis.
+            </li>
+          </ul>
+        </details>
+      </section>
+
+      <section id="task2" class="card">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Task 2</p>
+            <h2>SIFT from Scratch + RANSAC</h2>
+          </div>
+          <div class="tags">
+            <span class="tag">Gaussian Pyramid</span>
+            <span class="tag">Descriptor Matching</span>
+            <span class="tag">RANSAC</span>
+          </div>
+        </div>
+        <p>
+          The script below produces both the scratch results and the OpenCV baseline.
+          Artefacts are stored in <code>./output/task2/</code> for inclusion in the final
+          report.
+        </p>
+        <div class="command">
+          <pre><code id="cmd-task2">python task2_sift.py \
+  --image-a ./images/IMG_01.JPG \
+  --image-b ./images/IMG_02.JPG \
+  --resize-width 960 \
+  --output-dir ./output/task2 \
+  --octaves 4 \
+  --scales 3 \
+  --ratio-test 0.75 \
+  --ransac-iters 2000</code></pre>
+          <button class="btn copy" data-copy="#cmd-task2">Copy</button>
+        </div>
+        <div class="grid two">
+          <div>
+            <h3>Custom Pipeline Highlights</h3>
+            <ul>
+              <li>Gaussian + DoG pyramid construction</li>
+              <li>Contrast &amp; edge filtering of extrema</li>
+              <li>Orientation assignment &amp; 128-D descriptors</li>
+              <li>Descriptor matching with Lowe's ratio test</li>
+              <li>Homography estimation via bespoke RANSAC</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Comparison with OpenCV SIFT</h3>
+            <p>
+              The same matching + RANSAC configuration is applied to OpenCV's
+              <code>SIFT_create</code> output to provide a quantitative baseline. Match
+              visualisations (custom vs reference) are generated automatically.
+            </p>
+          </div>
+        </div>
+        <div class="gallery">
+          <figure>
+            <img src="output/task2/custom_sift_matches.jpg" alt="Custom SIFT matches" />
+            <figcaption>Custom SIFT inliers (after RANSAC)</figcaption>
+          </figure>
+          <figure>
+            <img src="output/task2/opencv_sift_matches.jpg" alt="OpenCV SIFT matches" />
+            <figcaption>OpenCV SIFT inliers (after RANSAC)</figcaption>
+          </figure>
+        </div>
+        <details>
+          <summary>Summary output</summary>
+          <p>
+            After running the command, review <code>output/task2/summary.txt</code> for the
+            exact keypoint counts, match totals, RANSAC inliers, and estimated homographies
+            for both the scratch implementation and the OpenCV baseline.
+          </p>
+        </details>
+      </section>
+
+      <section id="deliverables" class="card">
+        <h2>Deliverables Checklist</h2>
+        <ul class="checklist">
+          <li><span>✔</span> Task 1 panorama CLI + artefacts</li>
+          <li><span>✔</span> Task 2 SIFT-from-scratch implementation</li>
+          <li><span>✔</span> Comparative visualisations and summary metrics</li>
+          <li><span>✔</span> Webpage embedding both implementations</li>
+        </ul>
+        <p>
+          Include screenshots of this webpage and the generated figures in the final PDF
+          submission as evidence of both tasks being implemented and documented.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p>© Assignment 4 · Computer Vision · Fall 2025</p>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
+

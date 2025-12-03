@@ -1,0 +1,243 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  color-scheme: light dark;
+  --bg: #f6f8fb;
+  --card-bg: #fff;
+  --text: #1f2933;
+  --muted: #5c6b7c;
+  --accent: #5c6ac4;
+  --accent-dark: #3741a0;
+  --border: #e1e6ef;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+  border-radius: 12px;
+}
+
+code {
+  background: #161b22;
+  color: #f8f8f2;
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+header.hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2.5rem;
+  padding: 3rem clamp(1rem, 4vw, 5rem);
+  background: radial-gradient(circle at top, #e8ecff, var(--bg));
+}
+
+.hero__content .eyebrow {
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+.hero__content h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  margin-bottom: 0.8rem;
+}
+
+.hero__content .lead {
+  color: var(--muted);
+  font-size: 1.05rem;
+  max-width: 60ch;
+}
+
+.hero__actions {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  border: none;
+  border-radius: 999px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 10px 25px rgba(92, 106, 196, 0.3);
+}
+
+.btn.primary:hover {
+  background: var(--accent-dark);
+  transform: translateY(-1px);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.btn.copy {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  background: #111826;
+  color: #fff;
+}
+
+main {
+  padding: 0 clamp(1rem, 4vw, 5rem) 4rem;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 24px;
+  padding: clamp(1.5rem, 3vw, 2.75rem);
+  box-shadow: 0 15px 45px rgba(15, 23, 42, 0.08);
+  margin-top: 2rem;
+}
+
+.section-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tag {
+  background: #eef1ff;
+  color: #3a43a1;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.command {
+  position: relative;
+  margin: 1.5rem 0;
+  background: #0d1117;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.command pre {
+  margin: 0;
+  padding: 1.5rem;
+  overflow-x: auto;
+  color: #e6edf3;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+figure {
+  margin: 0;
+}
+
+figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+details {
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #f7f9ff;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.grid.two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.checklist {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.checklist li {
+  background: #eef1ff;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checklist span {
+  color: #00a36c;
+  font-size: 1.2rem;
+}
+
+footer {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+  .hero__content h1 {
+    font-size: 2.2rem;
+  }
+  .btn.copy {
+    top: auto;
+    bottom: 0.75rem;
+  }
+}
+

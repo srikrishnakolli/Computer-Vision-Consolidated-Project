@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Q3 — Template Matching (Correlation) + ROI Blur</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#0b1220; --panel:#0f172a; --ink:#e5ecff; --muted:#95a2c6; --line:#223154;
+    --accent:#5b8cff; --good:#22c55e; --warn:#f59e0b;
+    --chip:#17213a; --soft:#0e1a34;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#091125 0%,#070f21 100%);color:var(--ink);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
+  header{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px}
+  h1{margin:0;font-size:18px;font-weight:800;letter-spacing:.2px}
+  .pill{border:1px solid #2b3c66;background:#0e1a34;color:#9fb4ff;border-radius:999px;padding:6px 10px;font-size:12px}
+  .wrap{padding:16px;display:grid;grid-template-columns:360px 1fr;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 8px 24px rgba(3,8,20,.35)}
+  .title{margin:0 0 10px 0;font-size:12px;font-weight:800;letter-spacing:.5px;color:#9fb4ff;text-transform:uppercase}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .stack{display:flex;flex-direction:column;gap:12px}
+  label{font-size:12px;color:var(--muted)}
+  input[type="file"]{display:none}
+  .drop{border:2px dashed #23335a;background:#0c162f;border-radius:12px;padding:14px;text-align:center;cursor:pointer}
+  .drop strong{color:#b8c9ff}
+  .controls .row input[type="number"], .controls .row select{
+    width:110px;padding:8px 10px;border-radius:10px;border:1px solid #26345c;background:#0e1a34;color:#dbe6ff
+  }
+  .slider{accent-color:var(--accent);width:220px}
+  .btn{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer}
+  .btn.secondary{background:#0e1a34;color:#dbe6ff;border:1px solid #2a3a63}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .panes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  canvas{width:100%;max-height:72vh;background:#0a142b;border:1px solid #223154;border-radius:12px}
+  #overlay{position:absolute;left:0;top:0;background:transparent}
+  .thumbs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .thumb{background:#0e1a34;border:1px solid #223154;border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:6px}
+  .thumb img{width:100%;height:68px;object-fit:cover;border-radius:6px;border:1px solid #223154}
+  .thumb .meta{font-size:11px;color:#8fa2d9;display:flex;justify-content:space-between;align-items:center}
+  .swatch{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:6px}
+  .log{height:160px;overflow:auto;background:#0e1a34;border:1px solid #223154;border-radius:10px;padding:10px;font:12px ui-monospace,Menlo,Consolas,monospace;color:#cbd9ff}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{background:var(--chip);border:1px solid #203160;border-radius:999px;padding:6px 8px;font-size:11px;color:#9fb4ff}
+  .footer{padding-top:8px;margin-top:10px;border-top:1px dashed #23335a;color:#8ea2d9;font-size:12px;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<header>
+  <h1>Q3 — Template Matching (Correlation) + ROI Blur</h1>
+  <span class="pill">Runs fully in your browser · OpenCV.js</span>
+</header>
+
+<div class="wrap">
+  <!-- Controls -->
+  <div class="card controls">
+    <div class="stack">
+      <div>
+        <div class="title">Load Images</div>
+        <div class="grid-2">
+          <label class="drop" id="dropScene">Drop scene or <strong>click</strong><input id="sceneInput" type="file" accept="image/*"></label>
+          <label class="drop" id="dropTpl">Drop up to 10 templates<input id="tplInput" type="file" accept="image/*" multiple></label>
+        </div>
+        <div class="thumbs" id="tplThumbs"></div>
+      </div>
+
+      <div>
+        <div class="title">Matching</div>
+        <div class="row">
+          <label>Method</label>
+          <select id="method">
+            <option value="ccorr" selected>TM_CCORR_NORMED (Correlation)</option>
+            <option value="ccoeff">TM_CCOEFF_NORMED (Corr. Coef)</option>
+          </select>
+          <label><input type="checkbox" id="try180"> try 180°</label>
+        </div>
+        <div class="row">
+          <label>Threshold <span id="thVal">0.60</span></label>
+          <input class="slider" id="th" type="range" min="0.01" max="0.95" step="0.01" value="0.60"
+                 oninput="document.getElementById('thVal').textContent=this.value">
+        </div>
+        <div class="row">
+          <label>Scales</label>
+          <input id="sStart" type="number" step="0.05" value="0.6" title="start">
+          <input id="sStop"  type="number" step="0.05" value="1.6" title="stop">
+          <input id="sStep"  type="number" step="0.05" value="0.1" title="step">
+        </div>
+        <div class="row">
+          <label>Match downscale</label>
+          <input id="matchScale" type="number" min="0.25" max="1.0" step="0.05" value="1.0">
+          <label>NMS IoU</label>
+          <input id="nmsIoU" type="number" step="0.05" value="0.35">
+        </div>
+      </div>
+
+      <div>
+        <div class="title">Blur ROI</div>
+        <div class="row">
+          <label>Gaussian σ</label><input id="blurSigma" type="number" step="0.5" value="16.0">
+          <label>Kernel (odd; 0 = auto)</label><input id="blurK" type="number" step="2" value="0">
+          <div class="chips">
+            <span class="chip" id="cMild">Mild</span>
+            <span class="chip" id="cStrong">Strong</span>
+            <span class="chip" id="cMax">Max</span>
+          </div>
+        </div>
+        <label><input type="checkbox" id="forceBest" checked> If none pass threshold, blur the single best match</label>
+      </div>
+
+      <div class="row" style="justify-content:space-between;margin-top:6px">
+        <div class="row" style="gap:8px">
+          <button class="btn" id="runBtn" disabled>Run</button>
+          <button class="btn secondary" id="resetBtn">Reset</button>
+        </div>
+        <button class="btn" id="dlBtn" disabled>Download Result</button>
+      </div>
+
+      <div>
+        <div class="title">Log</div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>Tip: widen scales (0.5–1.6), lower threshold (0.15–0.35), enable 180° for rotated objects.</div>
+      <div id="perf">Ready</div>
+    </div>
+  </div>
+
+  <!-- Canvases -->
+  <div class="card">
+    <div class="panes">
+      <div>
+        <div class="title" style="margin-bottom:6px">Scene (detections)</div>
+        <div style="position:relative">
+          <canvas id="sceneCanvas"></canvas>
+          <canvas id="overlay"></canvas>
+        </div>
+      </div>
+      <div>
+        <div class="title" style="margin-bottom:6px">Output (blurred regions)</div>
+        <canvas id="outCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OpenCV.js -->
+<script src="https://docs.opencv.org/4.x/opencv.js"
+        onload="window.__opencv_loaded=true; if(window.appInit){appInit();}"
+        onerror="document.getElementById('log').textContent+='[ERR] Failed to load OpenCV.js\\n'"></script>
+
+<script>
+function appInit(){
+  const logEl = document.getElementById('log');
+  const perfEl = document.getElementById('perf');
+  function log(s){ logEl.textContent += s + "\\n"; logEl.scrollTop = logEl.scrollHeight; }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  if(typeof cv === 'undefined'){ log('[ERR] cv is undefined'); return; }
+
+  cv.onRuntimeInitialized = () => {
+    log('[OK] OpenCV.js ready');
+
+    // Elements
+    const sceneCanvas = document.getElementById('sceneCanvas');
+    const overlay = document.getElementById('overlay');
+    const outCanvas = document.getElementById('outCanvas');
+    const tplThumbs = document.getElementById('tplThumbs');
+
+    // State
+    let sceneMat=null, sceneGray=null;
+    let templates=[]; // {name, mat, gray, color}
+    const colors = ["#60a5fa","#f97316","#22c55e","#ef4444","#a78bfa","#f472b6","#eab308","#14b8a6","#f43f5e","#38bdf8"];
+
+    // Wire drag & drop
+    function wireDrop(zone, input){
+      zone.addEventListener('click', ()=> input.click());
+      zone.addEventListener('dragover', (e)=>{e.preventDefault(); zone.style.borderColor = "#37529b";});
+      zone.addEventListener('dragleave', ()=> zone.style.borderColor = "");
+      zone.addEventListener('drop', (e)=>{
+        e.preventDefault(); zone.style.borderColor = "";
+        input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change'));
+      });
+    }
+    wireDrop(document.getElementById('dropScene'), document.getElementById('sceneInput'));
+    wireDrop(document.getElementById('dropTpl'), document.getElementById('tplInput'));
+
+    function enableRun(){ document.getElementById('runBtn').disabled = !(sceneMat && templates.length>0); }
+
+    // Load scene
+    document.getElementById('sceneInput').addEventListener('change', (e)=>{
+      const f=e.target.files?.[0]; if(!f) return;
+      const url=URL.createObjectURL(f);
+      const img=new Image();
+      img.onload=()=>{
+        sceneCanvas.width=img.naturalWidth; sceneCanvas.height=img.naturalHeight;
+        overlay.width=img.naturalWidth; overlay.height=img.naturalHeight;
+        outCanvas.width=img.naturalWidth; outCanvas.height=img.naturalHeight;
+
+        const ctx=sceneCanvas.getContext('2d'); ctx.drawImage(img,0,0);
+        if(sceneMat) sceneMat.delete(); if(sceneGray) sceneGray.delete();
+        sceneMat=cv.imread(sceneCanvas);
+        sceneGray=new cv.Mat(); cv.cvtColor(sceneMat, sceneGray, cv.COLOR_RGBA2GRAY);
+        cv.imshow('sceneCanvas', sceneMat);
+        overlay.getContext('2d').clearRect(0,0,overlay.width,overlay.height);
+        outCanvas.getContext('2d').clearRect(0,0,outCanvas.width,outCanvas.height);
+        log(`[OK] Scene: ${f.name} (${img.naturalWidth}×${img.naturalHeight})`);
+        URL.revokeObjectURL(url);
+        enableRun();
+      };
+      img.src=url;
+    });
+
+    // Load templates
+    document.getElementById('tplInput').addEventListener('change', (e)=>{
+      templates.forEach(t=>{ t.mat?.delete(); t.gray?.delete(); });
+      templates=[];
+      tplThumbs.innerHTML = "";
+      const files = Array.from(e.target.files||[]).slice(0,10);
+      if(files.length===0){ enableRun(); return; }
+      let remaining = files.length;
+      files.forEach((f,i)=>{
+        const url=URL.createObjectURL(f);
+        const img=new Image();
+        img.onload=()=>{
+          const c=document.createElement('canvas');
+          c.width=img.naturalWidth; c.height=img.naturalHeight;
+          c.getContext('2d').drawImage(img,0,0);
+          const mat=cv.imread(c);
+          const gray=new cv.Mat(); cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+          const color = colors[i%colors.length];
+          templates.push({name:f.name.replace(/\.[^.]+$/,''), mat, gray, color});
+
+          // Thumbnail
+          const tdiv=document.createElement('div'); tdiv.className="thumb";
+          const im=document.createElement('img'); im.src=url;
+          const meta=document.createElement('div'); meta.className="meta";
+          const left=document.createElement('div');
+          const sw=document.createElement('span'); sw.className="swatch"; sw.style.background=color;
+          left.appendChild(sw); left.appendChild(document.createTextNode(templates[i]?.name || f.name));
+          const sc=document.createElement('span'); sc.textContent = "…";
+          meta.appendChild(left); meta.appendChild(sc);
+          tdiv.appendChild(im); tdiv.appendChild(meta);
+          tplThumbs.appendChild(tdiv);
+
+          if(--remaining===0){ log(`[OK] Templates: ${templates.length}`); enableRun(); }
+        };
+        img.src=url;
+      });
+    });
+
+    // Utils
+    function genScales(a,b,st){ const s=[]; const dir=a<=b?1:-1; for(let v=a; dir>0? v<=b+1e-9 : v>=b-1e-9; v+=st*dir){ s.push(+v.toFixed(4)); if(s.length>160) break; } return s; }
+    function iou(a,b){ const x1=Math.max(a.x,b.x), y1=Math.max(a.y,b.y);
+      const x2=Math.min(a.x+a.w,b.x+b.w), y2=Math.min(a.y+a.h,b.y+b.h);
+      const iw=Math.max(0,x2-x1), ih=Math.max(0,y2-y1), inter=iw*ih;
+      return inter / (a.w*a.h + b.w*b.h - inter + 1e-9); }
+    function nms(arr,thr=0.35){
+      const boxes=[...arr].sort((A,B)=>B.score-A.score), keep=[], used=Array(boxes.length).fill(false);
+      for(let i=0;i<boxes.length;i++){
+        if(used[i]) continue; keep.push(boxes[i]);
+        for(let j=i+1;j<boxes.length;j++) if(!used[j] && iou(boxes[i],boxes[j])>thr) used[j]=true;
+      } return keep;
+    }
+    function drawBoxes(list){
+      const ctx=overlay.getContext('2d'); ctx.clearRect(0,0,overlay.width,overlay.height);
+      ctx.lineWidth=2; ctx.font="12px ui-sans-serif";
+      list.forEach(b=>{
+        ctx.strokeStyle=b.color; ctx.strokeRect(b.x,b.y,b.w,b.h);
+        const label=`${b.name} (${b.score.toFixed(3)})`; const tw=ctx.measureText(label).width;
+        ctx.fillStyle=b.color; ctx.globalAlpha=0.85;
+        ctx.fillRect(b.x,Math.max(0,b.y-18),tw+8,18);
+        ctx.globalAlpha=1;
+        ctx.fillStyle="#0b1220"; ctx.fillText(label,b.x+4,Math.max(10,b.y-5));
+      });
+    }
+    function rotateKeepAll(srcGray, angle){
+      const center=new cv.Point(srcGray.cols/2, srcGray.rows/2);
+      const M=cv.getRotationMatrix2D(center, angle, 1.0);
+      const cos=Math.abs(M.doubleAt(0,0)), sin=Math.abs(M.doubleAt(0,1));
+      const nW=Math.floor(srcGray.rows*sin + srcGray.cols*cos);
+      const nH=Math.floor(srcGray.rows*cos + srcGray.cols*sin);
+      M.doublePtr(0,2)[0] += (nW/2) - center.x;
+      M.doublePtr(1,2)[0] += (nH/2) - center.y;
+      const dst=new cv.Mat();
+      cv.warpAffine(srcGray, dst, M, new cv.Size(nW,nH), cv.INTER_LINEAR, cv.BORDER_REPLICATE);
+      M.delete(); return dst;
+    }
+    function matchBest(sceneG, tplG, scales, method, try180){
+      const res=new cv.Mat(), tmp=new cv.Mat();
+      const angles = try180 ? [0,180] : [0];
+      let best=null;
+      for(const ang of angles){
+        const tRot = (ang===0)? tplG : rotateKeepAll(tplG, ang);
+        for(const s of scales){
+          const tw=Math.max(5,Math.round(tRot.cols*s)), th=Math.max(5,Math.round(tRot.rows*s));
+          if(tw>=sceneG.cols || th>=sceneG.rows) continue;
+          cv.resize(tRot, tmp, new cv.Size(tw,th), 0,0, s<1.0?cv.INTER_AREA:cv.INTER_CUBIC);
+          cv.matchTemplate(sceneG, tmp, res, method);
+          const mm=cv.minMaxLoc(res);
+          const score = (method===cv.TM_SQDIFF || method===cv.TM_SQDIFF_NORMED) ? (1-mm.minVal) : mm.maxVal;
+          const loc = (method===cv.TM_SQDIFF || method===cv.TM_SQDIFF_NORMED) ? mm.minLoc : mm.maxLoc;
+          if(!best || score>best.score) best={x:loc.x,y:loc.y,w:tw,h:th,score,angle:ang};
+        }
+        if(ang!==0) tRot.delete();
+      }
+      res.delete(); tmp.delete();
+      return best;
+    }
+
+    // Presets
+    document.getElementById('cMild').onclick = ()=>{ document.getElementById('blurSigma').value=6;  document.getElementById('blurK').value=0; };
+    document.getElementById('cStrong').onclick= ()=>{ document.getElementById('blurSigma').value=12; document.getElementById('blurK').value=0; };
+    document.getElementById('cMax').onclick   = ()=>{ document.getElementById('blurSigma').value=20; document.getElementById('blurK').value=0; };
+
+    // Reset
+    document.getElementById('resetBtn').onclick = ()=>{
+      overlay.getContext('2d').clearRect(0,0,overlay.width,overlay.height);
+      outCanvas.getContext('2d').clearRect(0,0,outCanvas.width,outCanvas.height);
+      log('[INFO] Cleared overlays. Load/Run again.');
+      document.getElementById('dlBtn').disabled = true;
+    };
+
+    // Run
+    document.getElementById('runBtn').addEventListener('click', ()=>{
+      if(!sceneMat || templates.length===0){ log('[WARN] Load a scene and templates first.'); return; }
+
+      const threshold = parseFloat(document.getElementById('th').value);
+      const METHOD = (document.getElementById('method').value==='ccorr') ? cv.TM_CCORR_NORMED : cv.TM_CCOEFF_NORMED;
+      const try180 = document.getElementById('try180').checked;
+      const sStart=parseFloat(document.getElementById('sStart').value);
+      const sStop =parseFloat(document.getElementById('sStop').value);
+      const sStep =parseFloat(document.getElementById('sStep').value);
+      const scales=genScales(sStart,sStop,sStep);
+      const nmsIoU=parseFloat(document.getElementById('nmsIoU').value)||0.35;
+      const mScale=clamp(parseFloat(document.getElementById('matchScale').value)||1.0,0.25,1.0);
+      let sigma=parseFloat(document.getElementById('blurSigma').value)||16.0;
+      let ksize=parseInt(document.getElementById('blurK').value)||0;
+      const forceBest=document.getElementById('forceBest').checked;
+
+      // auto kernel ≈ 6σ+1 (odd)
+      const minK=Math.round(6*sigma + 1); if(ksize<=0 || ksize<minK){ ksize=(minK%2===0)?minK+1:minK; document.getElementById('blurK').value=ksize; }
+      if(ksize%2===0) ksize+=1;
+
+      // Prepare matching image (optional downscale)
+      let matchG=sceneGray, scaleBack=1.0, tmp=null;
+      if(mScale<0.999){
+        tmp=new cv.Mat();
+        cv.resize(sceneGray,tmp,new cv.Size(Math.max(10,Math.round(sceneGray.cols*mScale)),
+                                           Math.max(10,Math.round(sceneGray.rows*mScale))),0,0,cv.INTER_AREA);
+        matchG=tmp; scaleBack=1.0/mScale;
+      }
+
+      const t0=performance.now();
+      const candidates=[];
+      templates.forEach((t,i)=>{
+        // small pre-blur like your Python
+        const tSm=new cv.Mat();
+        cv.GaussianBlur(t.gray, tSm, new cv.Size(3,3), 0,0, cv.BORDER_DEFAULT);
+        const b = matchBest(matchG, tSm, scales, METHOD, try180);
+        tSm.delete();
+        if(!b) return;
+        const box = {
+          name:t.name, color:t.color,
+          x:Math.round(b.x*scaleBack), y:Math.round(b.y*scaleBack),
+          w:Math.round(b.w*scaleBack), h:Math.round(b.h*scaleBack),
+          score:b.score, angle:b.angle
+        };
+        candidates.push(box);
+        // show score near each template thumb
+        const scoreLabel = tplThumbs.children[i]?.querySelector('.meta span:last-child');
+        if(scoreLabel) scoreLabel.textContent = b.score.toFixed(3);
+        log(`Match ${t.name}: score=${b.score.toFixed(4)} @ (${box.x},${box.y},${box.w},${box.h}), angle=${b.angle}`);
+      });
+      if(tmp) tmp.delete();
+
+      // Filter by threshold + NMS
+      const passed = candidates.filter(c=>c.score>=threshold);
+      const boxes = nms(passed, nmsIoU);
+
+      // Draw detections
+      cv.imshow('sceneCanvas', sceneMat);
+      drawBoxes(boxes);
+
+      // Choose regions to blur
+      let toBlur=[...boxes];
+      if(forceBest && toBlur.length===0 && candidates.length>0){
+        const best=candidates.reduce((a,b)=> a.score>b.score?a:b);
+        toBlur=[best];
+        drawBoxes([{...best, name: best.name+' (forced)'}]);
+        log(`[DEBUG] Forced best: ${best.score.toFixed(4)} (below threshold)`);
+      }
+
+      // Blur ROIs
+      const out=sceneMat.clone();
+      for(const b of toBlur){
+        const rx=clamp(b.x,0,out.cols-1), ry=clamp(b.y,0,out.rows-1);
+        const rw=clamp(b.w,1,out.cols-rx), rh=clamp(b.h,1,out.rows-ry);
+        const roi=out.roi(new cv.Rect(rx,ry,rw,rh));
+        cv.GaussianBlur(roi, roi, new cv.Size(ksize,ksize), sigma, sigma, cv.BORDER_DEFAULT);
+        roi.delete();
+      }
+      cv.imshow('outCanvas', out); out.delete();
+
+      const ms=(performance.now()-t0).toFixed(1);
+      perfEl.textContent = `Done in ${ms} ms · Raw=${candidates.length} · Passed=${boxes.length} · Blurred=${toBlur.length}`;
+      document.getElementById('dlBtn').disabled = (toBlur.length===0);
+      if(toBlur.length===0) log('[INFO] No detections passed threshold; output equals original.');
+    });
+
+    // Download
+    document.getElementById('dlBtn').addEventListener('click', ()=> {
+      outCanvas.toBlob(blob=>{
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download='scene_blurred.png';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }, 'image/png', 0.95);
+    });
+
+    // Preset clicks enable run if images are loaded
+    ['cMild','cStrong','cMax'].forEach(id=>document.getElementById(id).addEventListener('click', ()=>{}));
+
+    // Enable run button only when both scene & >=1 template are ready
+    document.getElementById('runBtn').disabled = true;
+    function checkEnable(){ document.getElementById('runBtn').disabled = !(sceneMat && templates.length>0); }
+    const io = new MutationObserver(checkEnable);
+    io.observe(tplThumbs, {childList:true});
+  };
+}
+if(window.__opencv_loaded){ appInit(); }
+</script>
+</body>
+</html>

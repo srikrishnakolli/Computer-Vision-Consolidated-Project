@@ -1,0 +1,20 @@
+image_width:  4284
+image_height: 5712
+
+camera_matrix:
+  fx: 4124.85217000
+  fy: 4126.41606000
+  cx: 2774.74600000
+  cy: 2302.01489000
+  skew: 0.0
+
+distortion_model: plumb_bob   # (Brown–Conrady, 5 params)
+distortion_coefficients:
+  k1: -0.00898340
+  k2: -0.56108969
+  p1:  0.01006218
+  p2:  0.00449114
+  k3:  1.13245558
+
+reprojection_error_mean_px: 1.054507
+rms_opencv: 7.915254

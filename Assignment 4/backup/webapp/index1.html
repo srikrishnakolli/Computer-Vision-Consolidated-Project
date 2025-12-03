@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Panorama Stitcher (OpenCV.js)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="./styles.css">
+
+  <!-- Option A: CDN (recommended) -->
+  <script async src="https://unpkg.com/@techstark/opencv-js@4.7.0/build/opencv.js"
+          onload="cvReady()" onerror="cvFail()"></script>
+
+  <!-- Option B: Local copy (uncomment and comment Option A if you prefer local) -->
+  <!-- <script async src="./vendor/opencv.js" onload="cvReady()" onerror="cvFail()"></script> -->
+</head>
+<body>
+  <div class="wrap">
+    <h1>📷 Panorama Stitcher (Browser-only)</h1>
+
+    <section class="card">
+      <h2>Inputs</h2>
+      <div class="grid">
+        <div>
+          <label class="label">Camera sequence (left → right)</label>
+          <input id="camFiles" type="file" accept="image/*" multiple>
+          <div class="row">
+            <button id="btnSortName" class="btn">Sort by filename (00,01,...)</button>
+            <button id="btnReverse"  class="btn">Reverse order</button>
+            <button id="btnClear"    class="btn">Clear</button>
+            <span class="pill">Tip: rename as 00.jpg, 01.jpg, …</span>
+          </div>
+          <div id="camList" class="list"></div>
+          <p class="hint">Drag rows to reorder. Index 0 should be the leftmost photo.</p>
+        </div>
+        <div>
+          <label class="label">Phone panorama (same scene)</label>
+          <input id="panoFile" type="file" accept="image/*">
+          <div id="panoThumb" class="thumbs"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Options</h2>
+      <div class="row">
+        <span>Resize max dimension</span>
+        <input id="resize" type="range" min="900" max="2200" step="100" value="1400">
+        <span id="resizeVal" class="metric">1400 px</span>
+        <label class="row"><input id="saveVis" type="checkbox"> Show sample match overlay</label>
+      </div>
+      <div class="row">
+        <button id="btnStitch"  class="btn primary">▶ Stitch</button>
+        <button id="btnCompare" class="btn">🔍 Compare vs phone pano</button>
+        <span id="status" class="pill"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Results</h2>
+      <div id="oursRow" class="row"></div>
+    </section>
+
+    <section class="card">
+      <h2>Comparison</h2>
+      <div id="cmpRow" class="row"></div>
+      <div id="metricsRow" class="row"></div>
+    </section>
+
+    <section class="card">
+      <h2>Match overlay (sample)</h2>
+      <div id="matchRow" class="row"></div>
+      <p class="hint">Turn on “Show sample match overlay” and stitch again to see examples.</p>
+    </section>
+  </div>
+
+  <script>
+    function cvReady(){ window.__cv_was_loaded = true; }
+    function cvFail(){ alert("OpenCV.js failed to load. Try another network or use vendor/opencv.js locally."); }
+  </script>
+  <script src="./app.js"></script>
+</body>
+</html>

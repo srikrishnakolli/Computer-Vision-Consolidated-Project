@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Real‑World Dimensions from Image / Webcam</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --muted:#a9b0bd; --text:#eef2ff; --accent:#73e073; --border:#232733;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  header{padding:16px 20px; border-bottom:1px solid var(--border); position:sticky; top:0; background:linear-gradient(180deg, rgba(15,17,21,.9), rgba(15,17,21,.8)); backdrop-filter: blur(6px);}
+  h1{font-size:18px; margin:0 0 8px}
+  .muted{color:var(--muted)}
+  .wrap{padding:16px; display:grid; gap:16px; grid-template-columns: 320px 1fr;}
+  @media (max-width: 980px){ .wrap{grid-template-columns: 1fr} }
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px}
+  label{display:block; font-size:12px; color:var(--muted); margin:8px 0 4px}
+  input[type="number"], input[type="text"], select{ width:100%; padding:8px 10px; background:#0b0d11; color:var(--text); border:1px solid var(--border); border-radius:10px; }
+  input[type="file"]{width:100%}
+  button{ padding:8px 12px; border-radius:10px; border:1px solid var(--border); color:var(--text); background:#1f2430; cursor:pointer }
+  button:hover{background:#2a3040}
+  .row{display:flex; flex-wrap:wrap; gap:8px}
+  .ok{color:#b9ffb9}
+  .warn{color:#ffd479}
+  .mono{font-family: ui-monospace, Menlo, Consolas, monospace}
+  canvas{ width:100%; height:auto; aspect-ratio: 3 / 2; border-radius:14px; border:1px solid var(--border); background:#000; display:block }
+  video{ width:100%; border-radius:10px; border:1px solid var(--border); background:#000 }
+  .pill{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--border); background:#141720; border-radius:999px}
+  .footer{padding:10px 0 0; font-size:12px; color:var(--muted)}
+  .k{background:#10131a; border:1px solid #303547; padding:1px 6px; border-radius:6px}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Real‑World Dimensions (Perspective Projection)</h1>
+    <div class="muted">Click‑drag a rectangle <span class="k">R</span> or pick two points <span class="k">L</span> to measure width/height or a straight‑line distance, given fx, fy, cx, cy and object depth Z (mm).</div>
+  </header>
+
+  <div class="wrap">
+    <!-- Controls -->
+    <section class="card" id="controls">
+      <div class="row">
+        <button id="modeRect" aria-pressed="true">Mode: Rectangle (R)</button>
+        <button id="modeLine">Mode: Line (L)</button>
+      </div>
+
+      <label for="file">Load image (PNG/JPG)</label>
+      <input type="file" id="file" accept="image/*">
+
+      <div class="row" style="margin-top:8px">
+        <button id="startWebcam">Start webcam</button>
+        <button id="captureFrame" disabled>Capture frame</button>
+        <button id="stopWebcam" disabled>Stop webcam</button>
+      </div>
+      <video id="video" playsinline muted hidden></video>
+
+      <label>fx (px)</label>
+      <input id="fx" type="number" step="0.001" value="4124.85217">
+      <label>fy (px)</label>
+      <input id="fy" type="number" step="0.001" value="4126.41606">
+      <label>cx (px)</label>
+      <input id="cx" type="number" step="0.001" value="2774.746">
+      <label>cy (px)</label>
+      <input id="cy" type="number" step="0.001" value="2302.01489">
+
+      <label>Z depth (mm)</label>
+      <input id="Z" type="number" step="0.01" value="300">
+
+      <div class="row" style="margin-top:8px">
+        <button id="saveSettings">Save settings</button>
+        <button id="resetSettings">Reset</button>
+      </div>
+
+      <label>Load intrinsics JSON (optional)</label>
+      <input type="file" id="calibFile" accept="application/json">
+      <div class="muted">Expected keys: <span class="mono">{"fx":…, "fy":…, "cx":…, "cy":…}</span></div>
+
+      <div class="footer">
+        <div><strong>Assumptions</strong>: object plane is approximately fronto‑parallel; Z is the camera→object‑plane distance (mm); image is already undistorted (recommended).</div>
+      </div>
+    </section>
+
+    <!-- Canvas + Results -->
+    <section class="card">
+      <canvas id="canvas" width="1200" height="800" aria-label="Image canvas"></canvas>
+      <div class="row" style="margin-top:10px">
+        <button id="clear">Clear overlay</button>
+        <button id="savePNG">Save annotated image</button>
+      </div>
+      <div id="status" class="muted" style="margin-top:10px">Load an image or capture a webcam frame.</div>
+      <div style="margin-top:8px"><strong>Selected:</strong> <span id="sel" class="mono">—</span></div>
+      <pre id="out" class="mono" style="white-space:pre-wrap; margin:8px 0 0; background:#0b0d11; padding:10px; border-radius:10px; border:1px solid var(--border)"></pre>
+    </section>
+  </div>
+
+<script>
+(function(){
+  // Elements
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const out = document.getElementById('out');
+  const sel = document.getElementById('sel');
+  const statusEl = document.getElementById('status');
+
+  const fxEl = document.getElementById('fx');
+  const fyEl = document.getElementById('fy');
+  const cxEl = document.getElementById('cx');
+  const cyEl = document.getElementById('cy');
+  const ZEl  = document.getElementById('Z');
+
+  const file = document.getElementById('file');
+  const calibFile = document.getElementById('calibFile');
+  const btnClear = document.getElementById('clear');
+  const btnSavePNG = document.getElementById('savePNG');
+  const btnSaveSettings = document.getElementById('saveSettings');
+  const btnResetSettings = document.getElementById('resetSettings');
+
+  const modeRectBtn = document.getElementById('modeRect');
+  const modeLineBtn = document.getElementById('modeLine');
+
+  const startWebcam = document.getElementById('startWebcam');
+  const captureFrame = document.getElementById('captureFrame');
+  const stopWebcam = document.getElementById('stopWebcam');
+  const video = document.getElementById('video');
+
+  // State
+  let mode = 'rect'; // 'rect' or 'line'
+  let img = new Image();
+  let imgW = 0, imgH = 0;
+  let viewScale = 1.0, offX = 0, offY = 0;
+  let dragging = false; let start = null; let current = null;
+  let points = []; // For line mode
+  let stream = null;
+  let hasImage = false;
+
+  // Helpers
+  function resizeCanvasToDisplaySize(){
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.round(rect.width * dpr);
+    const h = Math.round(rect.height * dpr);
+    if (canvas.width !== w || canvas.height !== h){
+      canvas.width = w;
+      canvas.height = h;
+    }
+  }
+  function getCanvasXY(evt){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { x: (evt.clientX - rect.left) * scaleX, y: (evt.clientY - rect.top) * scaleY };
+  }
+  function drawBase(){
+    resizeCanvasToDisplaySize();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(!hasImage) return;
+    const s = Math.min(canvas.width/imgW, canvas.height/imgH);
+    viewScale = s;
+    const dw = imgW * s, dh = imgH * s;
+    offX = (canvas.width - dw)/2;
+    offY = (canvas.height - dh)/2;
+    ctx.drawImage(img, offX, offY, dw, dh);
+  }
+  function toImage(px, py){
+    // canvas→image coordinates
+    const u = (px - offX) / viewScale;
+    const v = (py - offY) / viewScale;
+    return {u, v};
+  }
+  function toCanvas(u, v){
+    return {x: offX + u*viewScale, y: offY + v*viewScale};
+  }
+  function getParams(){
+    const fx = parseFloat(fxEl.value); const fy = parseFloat(fyEl.value);
+    const cx = parseFloat(cxEl.value); const cy = parseFloat(cyEl.value);
+    const Z  = parseFloat(ZEl.value);
+    if([fx,fy,cx,cy,Z].some(x => !Number.isFinite(x))){ return null; }
+    return {fx,fy,cx,cy,Z};
+  }
+  function pxToWorld(u,v,{fx,fy,cx,cy,Z}){
+    const X = (u - cx) * Z / fx; // mm
+    const Y = (v - cy) * Z / fy; // mm
+    return {X,Y};
+  }
+  function mmToInch(mm){ return mm/25.4; }
+  function setStatus(msg, cls=''){ statusEl.textContent = msg; statusEl.className = cls; }
+
+  // File load
+  file.addEventListener('change', e => {
+    const f = e.target.files[0]; if(!f) return;
+    const url = URL.createObjectURL(f);
+    img.onload = ()=>{ imgW = img.naturalWidth; imgH = img.naturalHeight; hasImage = true; drawBase(); setStatus(`Image loaded: ${imgW}×${imgH}`,'ok'); };
+    img.src = url;
+  });
+
+  // Intrinsics JSON
+  calibFile.addEventListener('change', async e => {
+    const f = e.target.files[0]; if(!f) return;
+    try{
+      const text = await f.text();
+      const j = JSON.parse(text);
+      if('fx' in j) fxEl.value = j.fx;
+      if('fy' in j) fyEl.value = j.fy;
+      if('cx' in j) cxEl.value = j.cx;
+      if('cy' in j) cyEl.value = j.cy;
+      setStatus('Loaded intrinsics from JSON.','ok');
+    }catch(err){ setStatus('Failed to parse JSON.','warn'); }
+  });
+
+  // Settings persistence
+  function saveSettings(){
+    const s = {fx:fxEl.value,fy:fyEl.value,cx:cxEl.value,cy:cyEl.value,Z:ZEl.value};
+    localStorage.setItem('rw_dims_settings', JSON.stringify(s));
+    setStatus('Settings saved to this browser.','ok');
+  }
+  function restoreSettings(){
+    const s = localStorage.getItem('rw_dims_settings');
+    if(!s) return;
+    try{ const j = JSON.parse(s); ['fx','fy','cx','cy','Z'].forEach(k=>{ if(j[k]!==undefined) document.getElementById(k).value = j[k]; });
+    }catch{} }
+  function resetSettings(){ localStorage.removeItem('rw_dims_settings'); setStatus('Settings cleared.','warn'); }
+  restoreSettings();
+  btnSaveSettings.addEventListener('click', saveSettings);
+  btnResetSettings.addEventListener('click', resetSettings);
+
+  // Mode toggle
+  function setMode(m){
+    mode = m;
+    modeRectBtn.setAttribute('aria-pressed', m==='rect');
+    modeLineBtn.setAttribute('aria-pressed', m==='line');
+    modeRectBtn.style.outline = m==='rect' ? '2px solid var(--accent)' : 'none';
+    modeLineBtn.style.outline = m==='line' ? '2px solid var(--accent)' : 'none';
+    points = []; sel.textContent = '—'; out.textContent=''; drawBase();
+  }
+  modeRectBtn.addEventListener('click', ()=> setMode('rect'));
+  modeLineBtn.addEventListener('click', ()=> setMode('line'));
+  window.addEventListener('keydown', e => { if(e.key==='r' || e.key==='R') setMode('rect'); if(e.key==='l' || e.key==='L') setMode('line'); });
+
+  // Mouse interactions
+  canvas.addEventListener('mousedown', e => {
+    if(!hasImage) return;
+    const {x, y} = getCanvasXY(e);
+    if(mode==='rect'){
+      dragging = true; start = {x,y}; current = {x,y};
+    }else{
+      const {u,v} = toImage(x,y);
+      points.push({u:Math.round(u), v:Math.round(v)});
+      if(points.length>2) points.shift();
+      drawBase();
+      ctx.save(); ctx.fillStyle = '#73e073';
+      points.forEach(p=>{ const c = toCanvas(p.u,p.v); ctx.beginPath(); ctx.arc(c.x,c.y,4,0,Math.PI*2); ctx.fill(); });
+      ctx.restore();
+      if(points.length===2) computeLine();
+    }
+  });
+  canvas.addEventListener('mousemove', e => {
+    if(!dragging || mode!=='rect' || !hasImage) return;
+    const p = getCanvasXY(e); current = {x: p.x, y: p.y};
+    drawBase();
+    ctx.save(); ctx.strokeStyle = '#73e073'; ctx.setLineDash([6,4]); ctx.lineWidth=2;
+    const x = Math.min(start.x, current.x), y = Math.min(start.y, current.y);
+    const w = Math.abs(current.x - start.x), h = Math.abs(current.y - start.y);
+    ctx.strokeRect(x,y,w,h); ctx.restore();
+  });
+  canvas.addEventListener('mouseup', e => {
+    if(!dragging || mode!=='rect' || !hasImage) return; dragging = false;
+    const x = Math.min(start.x, current.x), y = Math.min(start.y, current.y);
+    const w = Math.abs(current.x - start.x), h = Math.abs(current.y - start.y);
+    const p1 = toImage(x,y); const p2 = toImage(x+w,y+h);
+    const rx = Math.max(0, Math.min(Math.round(p1.u), imgW-1));
+    const ry = Math.max(0, Math.min(Math.round(p1.v), imgH-1));
+    const rw = Math.max(1, Math.min(Math.round(p2.u)-rx, imgW-rx));
+    const rh = Math.max(1, Math.min(Math.round(p2.v)-ry, imgH-ry));
+    sel.textContent = `x=${rx}, y=${ry}, w=${rw}, h=${rh}`;
+    computeRect(rx,ry,rw,rh);
+  });
+
+  function computeRect(x,y,w,h){
+    const P = getParams();
+    if(!P){ out.textContent='Enter valid intrinsics and Z.'; return; }
+    const u1=x, v1=y, u2=x+w, v2=y+h;
+    const A = pxToWorld(u1,v1,P), B = pxToWorld(u2,v2,P);
+    const W = Math.abs(B.X-A.X), H = Math.abs(B.Y-A.Y);
+    const txt = `Width  : ${W.toFixed(2)} mm (${mmToInch(W).toFixed(2)} in)\n`+
+                `Height : ${H.toFixed(2)} mm (${mmToInch(H).toFixed(2)} in)\n`+
+                `Notes  : Assumes fronto‑parallel plane at depth Z.`;
+    out.textContent = txt;
+
+    // Draw final rectangle + labels
+    drawBase();
+    ctx.save(); ctx.strokeStyle='#73e073'; ctx.lineWidth=2;
+    const c1 = toCanvas(x,y); const cw = w*viewScale, ch = h*viewScale;
+    ctx.strokeRect(c1.x,c1.y,cw,ch);
+    ctx.fillStyle='#73e073'; ctx.font='14px ui-monospace, Menlo, Consolas, monospace';
+    ctx.fillText(`W: ${W.toFixed(2)} mm`, c1.x+6, c1.y-8);
+    ctx.fillText(`H: ${H.toFixed(2)} mm`, c1.x+6, c1.y+ch+18);
+    ctx.restore();
+  }
+
+  function computeLine(){
+    const P = getParams();
+    if(!P){ out.textContent='Enter valid intrinsics and Z.'; return; }
+    const [p,q] = points; // image px
+    sel.textContent = `p1=(${p.u},${p.v}), p2=(${q.u},${q.v})`;
+    const A = pxToWorld(p.u,p.v,P), B = pxToWorld(q.u,q.v,P);
+    const dx = B.X - A.X, dy = B.Y - A.Y;
+    const D = Math.hypot(dx,dy);
+    out.textContent = `Distance: ${D.toFixed(2)} mm (${mmToInch(D).toFixed(2)} in)\nNotes   : Straight‑line length in object plane at depth Z.`;
+
+    // Draw line + endpoints + label
+    drawBase();
+    ctx.save(); ctx.strokeStyle='#73e073'; ctx.lineWidth=2; ctx.fillStyle='#73e073';
+    const c1 = toCanvas(p.u,p.v), c2 = toCanvas(q.u,q.v);
+    ctx.beginPath(); ctx.moveTo(c1.x,c1.y); ctx.lineTo(c2.x,c2.y); ctx.stroke();
+    ctx.beginPath(); ctx.arc(c1.x,c1.y,4,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(c2.x,c2.y,4,0,Math.PI*2); ctx.fill();
+    const midx=(c1.x+c2.x)/2, midy=(c1.y+c2.y)/2; ctx.font='14px ui-monospace, Menlo, Consolas, monospace';
+    ctx.fillText(`${D.toFixed(2)} mm`, midx+8, midy-8);
+    ctx.restore();
+  }
+
+  // Clear
+  btnClear.addEventListener('click', ()=>{ drawBase(); out.textContent=''; sel.textContent='—'; points=[]; });
+
+  // Save canvas PNG
+  btnSavePNG.addEventListener('click', ()=>{
+    const a = document.createElement('a');
+    a.download = 'annotated.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  });
+
+  // Webcam
+  async function startCam(){
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+      video.srcObject = stream; video.hidden = false; await video.play();
+      startWebcam.disabled = true; captureFrame.disabled = false; stopWebcam.disabled = false;
+      setStatus('Webcam started. Frame size set on capture.','ok');
+    }catch(err){ setStatus('Could not start webcam.', 'warn'); }
+  }
+  function stopCam(){
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+    video.pause(); video.srcObject = null; video.hidden = true;
+    startWebcam.disabled = false; captureFrame.disabled = true; stopWebcam.disabled = true;
+    setStatus('Webcam stopped.','warn');
+  }
+  function capture(){
+    if(!video.srcObject){ setStatus('Start webcam first.','warn'); return; }
+    const tmp = document.createElement('canvas'); tmp.width = video.videoWidth; tmp.height = video.videoHeight;
+    const tctx = tmp.getContext('2d'); tctx.drawImage(video,0,0);
+    img = new Image(); img.onload = ()=>{ imgW=img.naturalWidth; imgH=img.naturalHeight; hasImage=true; drawBase(); setStatus(`Captured frame: ${imgW}×${imgH}`,'ok'); };
+    img.src = tmp.toDataURL('image/png');
+  }
+
+  startWebcam.addEventListener('click', startCam);
+  captureFrame.addEventListener('click', capture);
+  stopWebcam.addEventListener('click', stopCam);
+
+  // Initial mode
+  window.addEventListener('resize', drawBase);
+  setMode('rect');
+  setStatus('Load an image or start the webcam. Then draw ROI (R) or pick two points (L).');
+})();
+</script>
+</body>
+</html>

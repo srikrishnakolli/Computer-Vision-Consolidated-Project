@@ -1,0 +1,10 @@
+custom_keypoints_A: 0
+custom_keypoints_B: 0
+custom_matches: 0
+custom_inliers: 0
+opencv_keypoints_A: 1173
+opencv_keypoints_B: 1102
+opencv_matches: 406
+opencv_inliers: 272
+custom_homography: None
+opencv_homography: [[1.1877761802161118, -0.1073468291420078, -320.677631441722], [0.25221050523433347, 0.8943358242513557, 17.998461435847673], [0.000401327387964333, -0.00022070400747970003, 1.0]]

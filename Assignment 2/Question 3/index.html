@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Template Matching → Detect & Blur (3-Panel)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{--bg:#f6f8fb;--ink:#1f2a3d;--muted:#6a748c;--line:#dde5f2;--accent:#2a71ff;--ok:#23a26d;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
+  header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;justify-content:space-between;background:#fff}
+  h1{margin:0;font-size:18px;font-weight:800}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+  .btn.light{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .toolbar{padding:10px 16px;display:flex;gap:12px;align-items:center;justify-content:center}
+  .chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;color:#32415b}
+  .slider{width:180px;accent-color:var(--accent)}
+  .inputs input{width:90px;padding:6px 8px;border-radius:10px;border:1px solid var(--line)}
+  .wrap{padding:12px 16px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:8px 8px 12px;box-shadow:0 1px 0 rgba(16,24,40,.04)}
+  .title{margin:8px;font-size:14px;font-weight:800;text-align:center;color:#49566f}
+  canvas{width:100%;max-height:70vh;border:1px solid var(--line);border-radius:12px;background:#fff}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .log{margin-top:8px;height:120px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;font:12px ui-monospace,Menlo,Consolas,monospace}
+  .drop{border:2px dashed var(--line);background:#f0f4fb;border-radius:12px;padding:10px;text-align:center;cursor:pointer}
+  .thumbs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px}
+  .thumb{background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px}
+  .thumb img{width:100%;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+  .muted{color:var(--muted)}
+  .footer{display:flex;gap:12px;justify-content:center;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Template Matching (Correlation) → Detect & Blur</h1>
+  <div class="row">
+    <label class="drop" id="dropScene">Scene<input id="sceneInput" type="file" accept="image/*" hidden></label>
+    <label class="drop" id="dropTpl">Templates ×10<input id="tplInput" type="file" accept="image/*" multiple hidden></label>
+  </div>
+</header>
+
+<div class="toolbar">
+  <button id="runBtn" class="btn" disabled>🚀 Run detection & blur</button>
+  <span class="chip">Method:
+    <select id="method">
+      <option value="ccorr" selected>TM_CCORR_NORMED</option>
+      <option value="ccoeff">TM_CCOEFF_NORMED</option>
+    </select>
+  </span>
+  <span class="chip">Threshold <span id="thVal">0.30</span>
+    <input id="th" class="slider" type="range" min="0.01" max="0.95" step="0.01" value="0.30"
+           oninput="document.getElementById('thVal').textContent=this.value">
+  </span>
+  <span class="chip inputs">Scales
+    <input id="sStart" type="number" step="0.05" value="0.5" title="start">
+    <input id="sStop"  type="number" step="0.05" value="1.6" title="stop">
+    <input id="sStep"  type="number" step="0.05" value="0.1" title="step">
+  </span>
+  <span class="chip"><label><input type="checkbox" id="try180"> try 180°</label></span>
+  <span class="chip">Blur σ <input id="sigma" type="number" step="0.5" value="16.0"> | k (0=auto) <input id="kSize" type="number" step="2" value="0"></span>
+  <span class="chip"><label><input type="checkbox" id="forceBest" checked> force best if none</label></span>
+</div>
+
+<div class="wrap">
+  <div class="thumbs" id="tplThumbs"></div>
+
+  <div class="grid3">
+    <div class="card">
+      <div class="title">Scene (preprocessed)</div>
+      <canvas id="sceneCanvas"></canvas>
+    </div>
+    <div class="card">
+      <div class="title">Detections (correlation + NMS)</div>
+      <canvas id="annotCanvas"></canvas>
+    </div>
+    <div class="card">
+      <div class="title">Blurred regions</div>
+      <canvas id="outCanvas"></canvas>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button id="dlAnn" class="btn light" disabled>⬇️ Download annotated</button>
+    <button id="dlBlur" class="btn light" disabled>⬇️ Download blurred</button>
+    <span id="perf" class="muted">Ready</span>
+  </div>
+
+  <div class="log" id="log"></div>
+</div>
+
+<script src="https://docs.opencv.org/4.x/opencv.js"
+  onload="window.__opencv_loaded=true; if(window.boot){boot();}"
+  onerror="document.getElementById('log').textContent+='[ERR] Failed to load OpenCV.js\\n'"></script>
+
+<script>
+function boot(){
+  const logEl = document.getElementById('log');
+  const perfEl = document.getElementById('perf');
+  const tplThumbs = document.getElementById('tplThumbs');
+  function log(s){ logEl.textContent += s + "\\n"; logEl.scrollTop = logEl.scrollHeight; }
+  function dl(canvas, name){ canvas.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; a.click(); URL.revokeObjectURL(a.href); }, 'image/png', 0.95); }
+  function autoK(sigma){ const k=Math.round(6*sigma+1); return (k%2===0)?k+1:k; }
+
+  if(typeof cv === 'undefined'){ log('[ERR] cv undefined'); return; }
+  cv.onRuntimeInitialized = ()=>{
+    log('[OK] OpenCV.js ready');
+
+    // Canvases
+    const cvScene = document.getElementById('sceneCanvas');
+    const cvAnn   = document.getElementById('annotCanvas');
+    const cvOut   = document.getElementById('outCanvas');
+
+    // State
+    let sceneRGBA=null, sceneGray=null;
+    let templates=[]; // {name, gray, color}
+    const colors=["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"];
+
+    // Drag & drop wiring
+    function wireDrop(zone, input){
+      zone.addEventListener('click', ()=> input.click());
+      zone.addEventListener('dragover', e=>{e.preventDefault(); zone.style.borderColor='#b8cffc';});
+      zone.addEventListener('dragleave', ()=> zone.style.borderColor='');
+      zone.addEventListener('drop', e=>{ e.preventDefault(); zone.style.borderColor=''; input.files=e.dataTransfer.files; input.dispatchEvent(new Event('change')); });
+    }
+    wireDrop(document.getElementById('dropScene'), document.getElementById('sceneInput'));
+    wireDrop(document.getElementById('dropTpl'),   document.getElementById('tplInput'));
+
+    function enableRun(){ document.getElementById('runBtn').disabled = !(sceneRGBA && templates.length>0); }
+
+    // Load scene
+    document.getElementById('sceneInput').addEventListener('change', (e)=>{
+      const f=e.target.files?.[0]; if(!f) return;
+      const url=URL.createObjectURL(f);
+      const img=new Image();
+      img.onload=()=>{
+        [cvScene, cvAnn, cvOut].forEach(c=>{ c.width=img.naturalWidth; c.height=img.naturalHeight; });
+        // draw original into mat
+        const tmp=document.createElement('canvas'); tmp.width=img.naturalWidth; tmp.height=img.naturalHeight;
+        tmp.getContext('2d').drawImage(img,0,0);
+        if(sceneRGBA) sceneRGBA.delete(); if(sceneGray) sceneGray.delete();
+        sceneRGBA=cv.imread(tmp);
+        sceneGray=new cv.Mat(); cv.cvtColor(sceneRGBA, sceneGray, cv.COLOR_RGBA2GRAY);
+        // slight denoise + equalize for display (preprocessed)
+        const show = new cv.Mat(); cv.GaussianBlur(sceneGray, show, new cv.Size(3,3), 0);
+        cv.equalizeHist(show, show);
+        const showRGBA = new cv.Mat(); cv.cvtColor(show, showRGBA, cv.COLOR_GRAY2RGBA);
+        cv.imshow(cvScene, showRGBA);
+        show.delete(); showRGBA.delete();
+        // clear others
+        [cvAnn, cvOut].forEach(c=> c.getContext('2d').clearRect(0,0,c.width,c.height));
+        log(`[OK] Scene loaded: ${f.name} (${img.naturalWidth}×${img.naturalHeight})`);
+        URL.revokeObjectURL(url); enableRun();
+      };
+      img.src=url;
+    });
+
+    // Load templates
+    document.getElementById('tplInput').addEventListener('change', (e)=>{
+      templates.forEach(t=> t.gray?.delete());
+      templates=[]; tplThumbs.innerHTML='';
+      const files=Array.from(e.target.files||[]).slice(0,10);
+      if(files.length===0){ enableRun(); return; }
+      let remain=files.length;
+      files.forEach((f,i)=>{
+        const url=URL.createObjectURL(f);
+        const img=new Image();
+        img.onload=()=>{
+          const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
+          c.getContext('2d').drawImage(img,0,0);
+          const rgba=cv.imread(c); const g=new cv.Mat(); cv.cvtColor(rgba, g, cv.COLOR_RGBA2GRAY); rgba.delete();
+          // mild blur like Python
+          cv.GaussianBlur(g, g, new cv.Size(3,3), 0);
+          const color=colors[i%colors.length];
+          templates.push({name:f.name.replace(/\.[^.]+$/,''), gray:g, color});
+          // thumb
+          const tdiv=document.createElement('div'); tdiv.className='thumb';
+          const im=document.createElement('img'); im.src=url;
+          const cap=document.createElement('div'); cap.className='muted'; cap.textContent=f.name;
+          tdiv.appendChild(im); tdiv.appendChild(cap); tplThumbs.appendChild(tdiv);
+          URL.revokeObjectURL(url);
+          if(--remain===0){ log(`[OK] Templates: ${templates.length}`); enableRun(); }
+        };
+        img.src=url;
+      });
+    });
+
+    // ---- Helpers for matching ----
+    function genScales(a,b,st){ const s=[]; const dir=a<=b?1:-1; for(let v=a; dir>0? v<=b+1e-9 : v>=b-1e-9; v+=st*dir){ s.push(+v.toFixed(4)); if(s.length>160) break; } return s; }
+    function iou(a,b){ const x1=Math.max(a.x,b.x), y1=Math.max(a.y,b.y);
+      const x2=Math.min(a.x+a.w,b.x+b.w), y2=Math.min(a.y+a.h,b.y+b.h);
+      const iw=Math.max(0,x2-x1), ih=Math.max(0,y2-y1), inter=iw*ih;
+      return inter/(a.w*a.h+b.w*b.h-inter+1e-9); }
+    function nms(arr,thr=0.35){ const boxes=[...arr].sort((A,B)=>B.score-A.score), keep=[], used=Array(boxes.length).fill(false);
+      for(let i=0;i<boxes.length;i++){ if(used[i]) continue; keep.push(boxes[i]);
+        for(let j=i+1;j<boxes.length;j++) if(!used[j]&&iou(boxes[i],boxes[j])>thr) used[j]=true; } return keep; }
+    function rotateKeepAll(srcGray, angle){
+      const center=new cv.Point(srcGray.cols/2, srcGray.rows/2);
+      const M=cv.getRotationMatrix2D(center, angle, 1.0);
+      const cos=Math.abs(M.doubleAt(0,0)), sin=Math.abs(M.doubleAt(0,1));
+      const nW=Math.floor(srcGray.rows*sin + srcGray.cols*cos);
+      const nH=Math.floor(srcGray.rows*cos + srcGray.cols*sin);
+      M.doublePtr(0,2)[0] += (nW/2) - center.x; M.doublePtr(1,2)[0] += (nH/2) - center.y;
+      const dst=new cv.Mat(); cv.warpAffine(srcGray, dst, M, new cv.Size(nW,nH), cv.INTER_LINEAR, cv.BORDER_REPLICATE); M.delete(); return dst;
+    }
+    function matchBest(sceneG, tplG, scales, method, try180){
+      const res=new cv.Mat(), tmp=new cv.Mat(); const angles=try180?[0,180]:[0]; let best=null;
+      for(const ang of angles){
+        const tRot=(ang===0)?tplG:rotateKeepAll(tplG,ang);
+        for(const s of scales){
+          const tw=Math.max(5,Math.round(tRot.cols*s)), th=Math.max(5,Math.round(tRot.rows*s));
+          if(tw>=sceneG.cols||th>=sceneG.rows) continue;
+          cv.resize(tRot,tmp,new cv.Size(tw,th),0,0,s<1.0?cv.INTER_AREA:cv.INTER_CUBIC);
+          cv.matchTemplate(sceneG,tmp,res,method);
+          const mm=cv.minMaxLoc(res);
+          const score=(method===cv.TM_SQDIFF||method===cv.TM_SQDIFF_NORMED)?(1-mm.minVal):mm.maxVal;
+          const loc=(method===cv.TM_SQDIFF||method===cv.TM_SQDIFF_NORMED)?mm.minLoc:mm.maxLoc;
+          if(!best||score>best.score) best={x:loc.x,y:loc.y,w:tw,h:th,score,angle:ang};
+        }
+        if(ang!==0) tRot.delete();
+      }
+      res.delete(); tmp.delete(); return best;
+    }
+
+    // ---- RUN ----
+    document.getElementById('runBtn').addEventListener('click', ()=>{
+      if(!sceneRGBA || templates.length===0){ log('[WARN] load scene + templates'); return; }
+
+      const threshold=parseFloat(document.getElementById('th').value);
+      const METHOD=(document.getElementById('method').value==='ccorr')?cv.TM_CCORR_NORMED:cv.TM_CCOEFF_NORMED;
+      const try180=document.getElementById('try180').checked;
+      const sStart=parseFloat(document.getElementById('sStart').value);
+      const sStop =parseFloat(document.getElementById('sStop').value);
+      const sStep =parseFloat(document.getElementById('sStep').value);
+      const sigma =parseFloat(document.getElementById('sigma').value)||16.0;
+      let ksize=parseInt(document.getElementById('kSize').value)||0;
+      const forceBest=document.getElementById('forceBest').checked;
+      const scales=genScales(sStart,sStop,sStep);
+      if(ksize<=0) ksize=autoK(sigma); if(ksize%2===0) ksize+=1;
+
+      const t0=performance.now();
+      const candidates=[];
+      templates.forEach((t,i)=>{
+        const b=matchBest(sceneGray,t.gray,scales,METHOD,try180);
+        if(!b) return;
+        const box={name:t.name,color:colors[i%colors.length],x:b.x,y:b.y,w:b.w,h:b.h,score:b.score,angle:b.angle};
+        candidates.push(box);
+        log(`Match ${t.name}: score=${b.score.toFixed(4)} @ (${b.x},${b.y},${b.w},${b.h}), angle=${b.angle}`);
+      });
+
+      const passed=candidates.filter(c=>c.score>=threshold);
+      const boxes=nms(passed,0.35);
+      // ---- draw annotated ----
+      const ann = sceneRGBA.clone();
+      boxes.forEach((b)=>{
+        const col=hex2rgb(b.color);
+        cv.rectangle(ann,new cv.Point(b.x,b.y),new cv.Point(b.x+b.w,b.y+b.h),col,2,cv.LINE_AA);
+        cv.putText(ann, `${b.name} (${b.score.toFixed(3)})`, new cv.Point(b.x, Math.max(15,b.y-6)),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.5, col, 1, cv.LINE_AA);
+      });
+      cv.imshow(cvAnn, ann); ann.delete();
+      document.getElementById('dlAnn').disabled = boxes.length===0;
+
+      // ---- blur ----
+      let toBlur=[...boxes];
+      if(forceBest && toBlur.length===0 && candidates.length>0){
+        const best=candidates.reduce((a,b)=> a.score>b.score?a:b);
+        toBlur=[best];
+        log(`[INFO] No boxes over threshold; forced best ${best.name} (${best.score.toFixed(3)})`);
+      }
+      const out = sceneRGBA.clone();
+      toBlur.forEach(b=>{
+        const roi=out.roi(new cv.Rect(Math.max(0,b.x),Math.max(0,b.y),
+                      Math.min(b.w,out.cols-b.x), Math.min(b.h,out.rows-b.y)));
+        cv.GaussianBlur(roi,roi,new cv.Size(ksize,ksize),sigma,sigma,cv.BORDER_DEFAULT);
+        roi.delete();
+      });
+      cv.imshow(cvOut, out); out.delete();
+      document.getElementById('dlBlur').disabled = toBlur.length===0;
+
+      const ms=(performance.now()-t0).toFixed(1);
+      perfEl.textContent=`Done in ${ms} ms · Raw=${candidates.length} · Passed=${boxes.length} · Blurred=${toBlur.length}`;
+    });
+
+    // Downloads
+    document.getElementById('dlAnn').onclick = ()=> dl(cvAnn, 'annotated.png');
+    document.getElementById('dlBlur').onclick= ()=> dl(cvOut, 'blurred.png');
+
+    // Helpers
+    function hex2rgb(hex){ const v=parseInt(hex.slice(1),16); return new cv.Scalar(v>>16 & 255, v>>8 & 255, v & 255, 255); }
+
+    // Enable run when ready
+    document.getElementById('runBtn').disabled=true;
+    const mo=new MutationObserver(()=> document.getElementById('runBtn').disabled=!(sceneRGBA && templates.length>0));
+    mo.observe(tplThumbs,{childList:true});
+  };
+}
+  if (window.__opencv_loaded) { boot(); }
+</script>
+</body>
+</html>
