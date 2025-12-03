@@ -27,6 +27,9 @@ COPY . .
 # Expose port (Railway sets PORT env var dynamically)
 EXPOSE 5000
 
-# Run Gunicorn
-CMD gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 120
+# Set default PORT (Railway will override this)
+ENV PORT=5000
+
+# Run Gunicorn using shell form to properly expand $PORT
+CMD sh -c "gunicorn app:app --bind 0.0.0.0:${PORT:-5000} --workers 2 --threads 2 --timeout 120"
 
