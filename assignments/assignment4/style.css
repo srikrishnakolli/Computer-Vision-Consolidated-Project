@@ -244,6 +244,16 @@ footer {
   margin: 1.5rem 0;
 }
 
+.upload-container label[for="imageInput"] {
+  cursor: pointer;
+  display: inline-block;
+}
+
+.upload-container label[for="imageInput"]:hover {
+  background: var(--accent-dark);
+  transform: translateY(-1px);
+}
+
 .selected-files {
   margin-top: 1rem;
   padding: 1rem;
