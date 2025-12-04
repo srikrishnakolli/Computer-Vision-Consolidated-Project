@@ -2,6 +2,14 @@
 
 This repository contains all Computer Vision assignments (1-7) integrated into a single unified web application.
 
+## Written Part for Modules
+
+| Module | Description | Document Link |
+|--------|-------------|---------------|
+| Module 1 | Camera Calibration & Dimension Measurement | [View Document](https://drive.google.com/file/d/1Otc5DTOo3k-h-gCH7_F30ayMB8yDTcm3/view?usp=sharing) |
+| Module 5-6 | Real-Time Object Tracking | [View Document](https://drive.google.com/file/d/1b1N4sSvY8r6sh9uy5Wzs35s64EQXCWvE/view?usp=sharing) |
+| Module 7 | Stereo Vision & Pose Tracking | [View Document](https://drive.google.com/file/d/1DljQ4I1K-1Khw4UD2XdLgWJRXq0W_SS2/view?usp=sharing) |
+
 ## Video Demonstrations
 
 | Module | Description | Video Link |
