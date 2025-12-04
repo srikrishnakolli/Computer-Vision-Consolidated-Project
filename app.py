@@ -5,6 +5,7 @@ Serves static files and provides backend API endpoints
 """
 
 import os
+import sys
 from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
 import cv2
@@ -13,6 +14,11 @@ import json
 import base64
 from io import BytesIO
 from PIL import Image
+import math
+import random
+import dataclasses
+from typing import List, Tuple
+from pathlib import Path
 
 # Assignment 7 backend functions (copied to avoid import issues)
 calibration_storage = {}
@@ -396,6 +402,172 @@ def stitch_panorama():
     except Exception as e:
         import traceback
         return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+# ========== Assignment 4 Task 2: SIFT + RANSAC API ==========
+
+# Import SIFT implementation from task2_sift.py
+try:
+    sys.path.insert(0, str(Path(__file__).parent / 'assignments' / 'assignment4'))
+    from task2_sift import (
+        SIFTFromScratch, Keypoint, Match,
+        match_descriptors, ransac_homography, draw_matches,
+        to_grayscale_float, keypoints_to_array
+    )
+    SIFT_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Could not import SIFT modules: {e}")
+    SIFT_AVAILABLE = False
+
+@app.route('/api/sift_ransac', methods=['POST'])
+def sift_ransac():
+    """Perform SIFT feature matching and RANSAC homography estimation"""
+    if not SIFT_AVAILABLE:
+        return jsonify({'success': False, 'error': 'SIFT implementation not available'}), 500
+    
+    try:
+        if 'image_a' not in request.files or 'image_b' not in request.files:
+            return jsonify({'success': False, 'error': 'Need two images: image_a and image_b'}), 400
+        
+        file_a = request.files['image_a']
+        file_b = request.files['image_b']
+        
+        # Get optional parameters
+        resize_width = request.form.get('resize_width', type=int, default=960)
+        octaves = request.form.get('octaves', type=int, default=4)
+        scales = request.form.get('scales', type=int, default=3)
+        ratio_test = request.form.get('ratio_test', type=float, default=0.75)
+        ransac_iters = request.form.get('ransac_iters', type=int, default=2000)
+        ransac_threshold = request.form.get('ransac_threshold', type=float, default=3.0)
+        
+        # Read images
+        file_a_bytes = file_a.read()
+        file_b_bytes = file_b.read()
+        
+        nparr_a = np.frombuffer(file_a_bytes, np.uint8)
+        nparr_b = np.frombuffer(file_b_bytes, np.uint8)
+        
+        img_a = cv2.imdecode(nparr_a, cv2.IMREAD_COLOR)
+        img_b = cv2.imdecode(nparr_b, cv2.IMREAD_COLOR)
+        
+        if img_a is None or img_b is None:
+            return jsonify({'success': False, 'error': 'Failed to decode one or both images'}), 400
+        
+        # Resize if needed
+        if resize_width > 0:
+            for img in [img_a, img_b]:
+                if img.shape[1] > resize_width:
+                    scale = resize_width / img.shape[1]
+                    new_size = (resize_width, int(img.shape[0] * scale))
+                    img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+        
+        # Convert to grayscale float
+        gray_a = to_grayscale_float(img_a)
+        gray_b = to_grayscale_float(img_b)
+        
+        # Run custom SIFT
+        siftr = SIFTFromScratch(
+            num_octaves=octaves,
+            num_scales=scales,
+            sigma=1.6,
+            contrast_threshold=0.04,
+            edge_threshold=10.0,
+        )
+        
+        custom_kp_a, custom_desc_a = siftr.detect_and_compute(gray_a)
+        custom_kp_b, custom_desc_b = siftr.detect_and_compute(gray_b)
+        
+        # Match descriptors
+        custom_matches = match_descriptors(custom_desc_a, custom_desc_b, ratio_test)
+        
+        if len(custom_matches) < 4:
+            return jsonify({
+                'success': False,
+                'error': f'Not enough matches found: {len(custom_matches)}. Need at least 4 matches for RANSAC.'
+            }), 400
+        
+        # RANSAC
+        custom_pts_a = keypoints_to_array(custom_kp_a)
+        custom_pts_b = keypoints_to_array(custom_kp_b)
+        custom_H, custom_inliers = ransac_homography(
+            custom_pts_a, custom_pts_b, custom_matches, ransac_iters, ransac_threshold
+        )
+        
+        # OpenCV SIFT for comparison
+        reference = cv2.SIFT_create()
+        ref_kp_a, ref_desc_a = reference.detectAndCompute((gray_a * 255).astype(np.uint8), None)
+        ref_kp_b, ref_desc_b = reference.detectAndCompute((gray_b * 255).astype(np.uint8), None)
+        
+        bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+        ref_matches_knn = bf.knnMatch(ref_desc_a, ref_desc_b, k=2)
+        ref_matches = []
+        for m, n in ref_matches_knn:
+            if m.distance < ratio_test * n.distance:
+                ref_matches.append(m)
+        
+        ref_pts_a = np.array([kp.pt for kp in ref_kp_a], dtype=np.float32)
+        ref_pts_b = np.array([kp.pt for kp in ref_kp_b], dtype=np.float32)
+        ref_H, ref_inliers = ransac_homography(
+            ref_pts_a, ref_pts_b, ref_matches, ransac_iters, ransac_threshold
+        )
+        
+        # Draw matches (limit to 80 for visualization)
+        custom_vis = None
+        ref_vis = None
+        
+        if custom_inliers and len(custom_inliers) > 0:
+            custom_vis = draw_matches(
+                img_a, img_b,
+                [(kp.x, kp.y) for kp in custom_kp_a],
+                [(kp.x, kp.y) for kp in custom_kp_b],
+                custom_matches,
+                custom_inliers[:80]
+            )
+        
+        if ref_inliers and len(ref_inliers) > 0:
+            ref_vis = draw_matches(
+                img_a, img_b,
+                [kp.pt for kp in ref_kp_a],
+                [kp.pt for kp in ref_kp_b],
+                ref_matches,
+                ref_inliers[:80]
+            )
+        
+        # Encode visualization images to base64
+        result = {
+            'success': True,
+            'custom': {
+                'keypoints_a': len(custom_kp_a),
+                'keypoints_b': len(custom_kp_b),
+                'matches': len(custom_matches),
+                'inliers': len(custom_inliers),
+                'homography': custom_H.tolist() if custom_H is not None else None
+            },
+            'opencv': {
+                'keypoints_a': len(ref_kp_a),
+                'keypoints_b': len(ref_kp_b),
+                'matches': len(ref_matches),
+                'inliers': len(ref_inliers),
+                'homography': ref_H.tolist() if ref_H is not None else None
+            }
+        }
+        
+        if custom_vis is not None:
+            _, buffer = cv2.imencode('.jpg', custom_vis, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            result['custom']['matches_image'] = f'data:image/jpeg;base64,{base64.b64encode(buffer).decode("utf-8")}'
+        
+        if ref_vis is not None:
+            _, buffer = cv2.imencode('.jpg', ref_vis, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            result['opencv']['matches_image'] = f'data:image/jpeg;base64,{base64.b64encode(buffer).decode("utf-8")}'
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 if __name__ == '__main__':
     print("=" * 60)

@@ -235,3 +235,183 @@ function showError(message) {
   errorMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+// ========== Task 2: SIFT + RANSAC Functionality ==========
+let siftImageA = null;
+let siftImageB = null;
+
+const siftImageAInput = document.getElementById('siftImageA');
+const siftImageBInput = document.getElementById('siftImageB');
+const selectedImageADiv = document.getElementById('selectedImageA');
+const selectedImageBDiv = document.getElementById('selectedImageB');
+const siftProcessBtn = document.getElementById('siftProcessBtn');
+const siftClearBtn = document.getElementById('siftClearBtn');
+const siftLoadingIndicator = document.getElementById('siftLoadingIndicator');
+const siftErrorMessage = document.getElementById('siftErrorMessage');
+const siftResultContainer = document.getElementById('siftResultContainer');
+const customSiftImage = document.getElementById('customSiftImage');
+const opencvSiftImage = document.getElementById('opencvSiftImage');
+const customSiftStats = document.getElementById('customSiftStats');
+const opencvSiftStats = document.getElementById('opencvSiftStats');
+
+// Initialize SIFT handlers if elements exist
+if (siftImageAInput && siftImageBInput) {
+  siftImageAInput.addEventListener('change', (e) => {
+    siftImageA = e.target.files[0];
+    updateSiftImageDisplay('A', siftImageA, selectedImageADiv);
+    updateSiftButtons();
+  });
+
+  siftImageBInput.addEventListener('change', (e) => {
+    siftImageB = e.target.files[0];
+    updateSiftImageDisplay('B', siftImageB, selectedImageBDiv);
+    updateSiftButtons();
+  });
+
+  if (siftProcessBtn) {
+    siftProcessBtn.addEventListener('click', handleSiftProcess);
+  }
+
+  if (siftClearBtn) {
+    siftClearBtn.addEventListener('click', handleSiftClear);
+  }
+}
+
+function updateSiftImageDisplay(letter, file, container) {
+  if (!container) return;
+  
+  if (!file) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  container.innerHTML = `
+    <div class="file-item">
+      <span>Image ${letter}: ${file.name}</span>
+      <span class="file-size">(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+    </div>
+  `;
+}
+
+function updateSiftButtons() {
+  if (!siftProcessBtn || !siftClearBtn) return;
+  
+  const hasBoth = siftImageA && siftImageB;
+  siftProcessBtn.disabled = !hasBoth;
+  siftClearBtn.disabled = !siftImageA && !siftImageB;
+  
+  if (hasBoth) {
+    siftProcessBtn.style.opacity = '1';
+    siftProcessBtn.style.cursor = 'pointer';
+  } else {
+    siftProcessBtn.style.opacity = '0.5';
+    siftProcessBtn.style.cursor = 'not-allowed';
+  }
+}
+
+function handleSiftClear() {
+  siftImageA = null;
+  siftImageB = null;
+  if (siftImageAInput) siftImageAInput.value = '';
+  if (siftImageBInput) siftImageBInput.value = '';
+  updateSiftImageDisplay('A', null, selectedImageADiv);
+  updateSiftImageDisplay('B', null, selectedImageBDiv);
+  updateSiftButtons();
+  if (siftResultContainer) siftResultContainer.style.display = 'none';
+  if (siftErrorMessage) siftErrorMessage.style.display = 'none';
+}
+
+async function handleSiftProcess() {
+  if (!siftImageA || !siftImageB) {
+    showSiftError('Please select both Image A and Image B');
+    return;
+  }
+  
+  // Hide previous results and errors
+  if (siftResultContainer) siftResultContainer.style.display = 'none';
+  if (siftErrorMessage) siftErrorMessage.style.display = 'none';
+  if (siftLoadingIndicator) siftLoadingIndicator.style.display = 'block';
+  if (siftProcessBtn) siftProcessBtn.disabled = true;
+  
+  try {
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('image_a', siftImageA);
+    formData.append('image_b', siftImageB);
+    formData.append('resize_width', '960');
+    formData.append('octaves', '4');
+    formData.append('scales', '3');
+    formData.append('ratio_test', '0.75');
+    formData.append('ransac_iters', '2000');
+    formData.append('ransac_threshold', '3.0');
+    
+    // Call API
+    const response = await fetch('/api/sift_ransac', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await response.json();
+    
+    if (siftLoadingIndicator) siftLoadingIndicator.style.display = 'none';
+    if (siftProcessBtn) siftProcessBtn.disabled = false;
+    
+    if (!response.ok || !data.success) {
+      showSiftError(data.error || 'Failed to process SIFT + RANSAC. Please try again.');
+      return;
+    }
+    
+    // Display results
+    if (data.custom && data.custom.matches_image && customSiftImage) {
+      customSiftImage.src = data.custom.matches_image;
+      
+      if (customSiftStats) {
+        customSiftStats.innerHTML = `
+          <div class="sift-stats-content">
+            <p><strong>Keypoints A:</strong> ${data.custom.keypoints_a}</p>
+            <p><strong>Keypoints B:</strong> ${data.custom.keypoints_b}</p>
+            <p><strong>Matches:</strong> ${data.custom.matches}</p>
+            <p><strong>RANSAC Inliers:</strong> ${data.custom.inliers}</p>
+          </div>
+        `;
+      }
+    }
+    
+    if (data.opencv && data.opencv.matches_image && opencvSiftImage) {
+      opencvSiftImage.src = data.opencv.matches_image;
+      
+      if (opencvSiftStats) {
+        opencvSiftStats.innerHTML = `
+          <div class="sift-stats-content">
+            <p><strong>Keypoints A:</strong> ${data.opencv.keypoints_a}</p>
+            <p><strong>Keypoints B:</strong> ${data.opencv.keypoints_b}</p>
+            <p><strong>Matches:</strong> ${data.opencv.matches}</p>
+            <p><strong>RANSAC Inliers:</strong> ${data.opencv.inliers}</p>
+          </div>
+        `;
+      }
+    }
+    
+    if (siftResultContainer) {
+      siftResultContainer.style.display = 'block';
+      siftResultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    
+  } catch (error) {
+    if (siftLoadingIndicator) siftLoadingIndicator.style.display = 'none';
+    if (siftProcessBtn) siftProcessBtn.disabled = false;
+    showSiftError('Network error: ' + error.message);
+    console.error('SIFT processing error:', error);
+  }
+}
+
+function showSiftError(message) {
+  if (!siftErrorMessage) {
+    console.error('Error:', message);
+    alert('Error: ' + message);
+    return;
+  }
+  siftErrorMessage.textContent = `❌ Error: ${message}`;
+  siftErrorMessage.style.display = 'block';
+  siftErrorMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
