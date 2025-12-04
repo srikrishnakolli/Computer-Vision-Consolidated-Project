@@ -44,17 +44,21 @@ def serve_static(path):
     if '..' in path or path.startswith('/'):
         return "Forbidden", 403
     
+    # URL decode the path (handles spaces like "Assignment 1")
+    from urllib.parse import unquote
+    decoded_path = unquote(path)
+    
     # Try to serve from root first
-    if os.path.exists(path):
-        return send_from_directory('.', path)
+    if os.path.exists(decoded_path):
+        return send_from_directory('.', decoded_path)
     
     # Try assignments folder
-    assignments_path = os.path.join('assignments', path)
+    assignments_path = os.path.join('assignments', decoded_path)
     if os.path.exists(assignments_path):
-        return send_from_directory('assignments', path)
+        return send_from_directory('assignments', decoded_path)
     
     # Try nested paths in assignments
-    parts = path.split('/')
+    parts = decoded_path.split('/')
     if len(parts) >= 2:
         nested_path = os.path.join('assignments', '/'.join(parts))
         if os.path.exists(nested_path):

@@ -557,9 +557,11 @@
         if (avgError > 25) errorColor = '#ef4444'; // red for high error
 
         const row = document.createElement('tr');
+        // Encode the image path to handle spaces in folder names
+        const encodedImagePath = encodeURI(item.image_path);
         row.innerHTML = `
           <td>
-            <img src="${item.image_path}" alt="${item.object_name}" class="table-image" 
+            <img src="${encodedImagePath}" alt="${item.object_name}" class="table-image" 
                  onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'120\\' height=\\'120\\'%3E%3Crect fill=\\'%23334155\\' width=\\'120\\' height=\\'120\\'/%3E%3Ctext fill=\\'%2394a3b8\\' x=\\'50%25\\' y=\\'50%25\\' text-anchor=\\'middle\\' dy=\\'.3em\\'%3ENo Image%3C/text%3E%3C/svg%3E'">
           </td>
           <td class="object-name">${item.object_name}</td>
