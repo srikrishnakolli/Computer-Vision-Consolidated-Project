@@ -181,12 +181,17 @@
         
         <!-- Web-based SIFT + RANSAC Interface -->
         <div class="panorama-upload-section">
-          <h3>Upload Two Images for SIFT Matching</h3>
+          <h3>SIFT Matching with Task 1 Images</h3>
           <p>
-            Select two overlapping images to perform SIFT feature extraction, descriptor matching,
+            Use images from Task 1 above, or upload new images. Select two overlapping images to perform SIFT feature extraction, descriptor matching,
             and RANSAC-based homography estimation. Both custom SIFT implementation and OpenCV's
             SIFT are compared.
           </p>
+          
+          <div id="task1ImagesSelector" style="display: none; margin-bottom: 1rem; padding: 1rem; background: #eef1ff; border-radius: 12px;">
+            <strong>Use images from Task 1:</strong>
+            <div id="task1ImagesList" style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+          </div>
           
           <div class="upload-container">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">

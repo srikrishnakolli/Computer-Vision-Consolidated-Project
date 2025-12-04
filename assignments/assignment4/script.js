@@ -25,6 +25,8 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
 
 // Panorama Stitching Functionality
 let selectedFiles = [];
+// Global storage for Task 1 images (accessible by Task 2)
+window.task1Images = [];
 let imageInput, selectedFilesDiv, stitchBtn, clearBtn, loadingIndicator, errorMessage, resultContainer, panoramaResult, downloadBtn;
 
 // Wait for DOM to be fully loaded
@@ -239,6 +241,61 @@ function showError(message) {
 let siftImageA = null;
 let siftImageB = null;
 
+// Update Task 2 image selector with Task 1 images
+function updateTask2ImageSelector() {
+  const selectorDiv = document.getElementById('task1ImagesSelector');
+  const listDiv = document.getElementById('task1ImagesList');
+  
+  if (!selectorDiv || !listDiv) return;
+  
+  if (!window.task1Images || window.task1Images.length < 2) {
+    selectorDiv.style.display = 'none';
+    return;
+  }
+  
+  selectorDiv.style.display = 'block';
+  listDiv.innerHTML = '';
+  
+  window.task1Images.forEach((file, index) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn ghost';
+      btn.style.cssText = 'padding: 0.5rem; display: flex; flex-direction: column; align-items: center; gap: 0.25rem;';
+      btn.innerHTML = `
+        <img src="${e.target.result}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border);" />
+        <span style="font-size: 0.75rem;">Image ${index + 1}</span>
+      `;
+      btn.onclick = () => selectTask1ImageForSIFT(index, 'A');
+      listDiv.appendChild(btn);
+      
+      const btnB = btn.cloneNode(true);
+      btnB.innerHTML = `
+        <img src="${e.target.result}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border);" />
+        <span style="font-size: 0.75rem;">Image ${index + 1}</span>
+      `;
+      btnB.onclick = () => selectTask1ImageForSIFT(index, 'B');
+      listDiv.appendChild(btnB);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function selectTask1ImageForSIFT(index, letter) {
+  if (!window.task1Images || index >= window.task1Images.length) return;
+  
+  const file = window.task1Images[index];
+  if (letter === 'A') {
+    siftImageA = file;
+    updateSiftImageDisplay('A', file, selectedImageADiv);
+  } else {
+    siftImageB = file;
+    updateSiftImageDisplay('B', file, selectedImageBDiv);
+  }
+  updateSiftButtons();
+}
+
 const siftImageAInput = document.getElementById('siftImageA');
 const siftImageBInput = document.getElementById('siftImageB');
 const selectedImageADiv = document.getElementById('selectedImageA');
@@ -281,15 +338,35 @@ function updateSiftImageDisplay(letter, file, container) {
   
   if (!file) {
     container.innerHTML = '';
+    container.style.display = 'none';
     return;
   }
   
-  container.innerHTML = `
-    <div class="file-item">
-      <span>Image ${letter}: ${file.name}</span>
-      <span class="file-size">(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
-    </div>
-  `;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    container.innerHTML = `
+      <div class="sift-image-preview">
+        <div class="image-preview-large">
+          <img src="${e.target.result}" alt="Image ${letter}" />
+        </div>
+        <div class="file-info">
+          <span class="file-name">Image ${letter}: ${file.name}</span>
+          <span class="file-size">(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+        </div>
+      </div>
+    `;
+    container.style.display = 'block';
+  };
+  reader.onerror = () => {
+    container.innerHTML = `
+      <div class="file-item">
+        <span>Image ${letter}: ${file.name}</span>
+        <span class="file-size">(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+      </div>
+    `;
+    container.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
 }
 
 function updateSiftButtons() {
