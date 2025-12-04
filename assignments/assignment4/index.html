@@ -61,16 +61,63 @@
         <div class="section-header">
           <div>
             <p class="eyebrow">Task 1</p>
-            <h2>Panorama Stitching (Python)</h2>
+            <h2>Panorama Stitching (Web Interface)</h2>
           </div>
           <div class="tags">
             <span class="tag">OpenCV Stitcher</span>
-            <span class="tag">Exposure Compensation</span>
-            <span class="tag">CLI</span>
+            <span class="tag">Real-time Processing</span>
+            <span class="tag">Web-based</span>
           </div>
         </div>
+        
+        <!-- Web-based Panorama Stitching Interface -->
+        <div class="panorama-upload-section">
+          <h3>Upload Images for Stitching</h3>
+          <p>
+            Select multiple images (2 or more) with 40&ndash;60% overlap to create a panorama.
+            Images should be in order (left to right or right to left).
+          </p>
+          
+          <div class="upload-container">
+            <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
+            <button class="btn primary" onclick="document.getElementById('imageInput').click()">
+              📸 Select Images (Multiple)
+            </button>
+            <div id="selectedFiles" class="selected-files"></div>
+          </div>
+          
+          <div class="action-buttons">
+            <button id="stitchBtn" class="btn primary" disabled style="margin-top: 1rem;">
+              🖼️ Stitch Panorama
+            </button>
+            <button id="clearBtn" class="btn ghost" disabled style="margin-top: 1rem; margin-left: 0.5rem;">
+              Clear Selection
+            </button>
+          </div>
+          
+          <div id="loadingIndicator" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Stitching panorama... This may take a moment.</p>
+          </div>
+          
+          <div id="errorMessage" class="error-message" style="display: none;"></div>
+          
+          <div id="resultContainer" class="result-container" style="display: none;">
+            <h3>Stitched Panorama Result</h3>
+            <div class="panorama-display">
+              <img id="panoramaResult" alt="Stitched panorama" />
+            </div>
+            <button id="downloadBtn" class="btn primary" style="margin-top: 1rem;">
+              💾 Download Panorama
+            </button>
+          </div>
+        </div>
+        
+        <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);">
+        
+        <h3 style="margin-top: 2rem;">CLI Method (Alternative)</h3>
         <p>
-          Run the command below to stitch the bundled captures or replace the
+          Alternatively, you can run the command below to stitch the bundled captures or replace the
           <code>--images</code> folder with your own photos (ensure 40&ndash;60% overlap
           and ordered sweep).
         </p>

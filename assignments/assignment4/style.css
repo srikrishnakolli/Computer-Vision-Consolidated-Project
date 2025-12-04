@@ -231,6 +231,119 @@ footer {
   font-size: 0.9rem;
 }
 
+/* Panorama Upload Interface Styles */
+.panorama-upload-section {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #f7f9ff;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+.upload-container {
+  margin: 1.5rem 0;
+}
+
+.selected-files {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.selected-files-header {
+  margin-bottom: 0.75rem;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: #f0f4ff;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.file-size {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  margin: 1.5rem 0;
+}
+
+.spinner {
+  border: 4px solid #eef1ff;
+  border-top: 4px solid var(--accent);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-message {
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 12px;
+  color: #c33;
+  font-weight: 500;
+}
+
+.result-container {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #fff;
+  border-radius: 16px;
+  border: 2px solid var(--accent);
+}
+
+.result-container h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: var(--accent);
+}
+
+.panorama-display {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.panorama-display img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+}
+
 @media (max-width: 768px) {
   .hero__content h1 {
     font-size: 2.2rem;
@@ -238,6 +351,11 @@ footer {
   .btn.copy {
     top: auto;
     bottom: 0.75rem;
+  }
+  .file-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
   }
 }
 

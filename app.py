@@ -322,6 +322,81 @@ def detect_chessboard():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# ========== Assignment 4 Panorama Stitching API ==========
+
+@app.route('/api/stitch_panorama', methods=['POST'])
+def stitch_panorama():
+    """Stitch multiple images into a panorama"""
+    try:
+        if 'images' not in request.files:
+            return jsonify({'success': False, 'error': 'No images provided'}), 400
+        
+        files = request.files.getlist('images')
+        if len(files) < 2:
+            return jsonify({'success': False, 'error': 'Need at least 2 images to stitch'}), 400
+        
+        # Read and decode images
+        images = []
+        for file in files:
+            if file.filename == '':
+                continue
+            file_bytes = file.read()
+            nparr = np.frombuffer(file_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if img is None:
+                return jsonify({'success': False, 'error': f'Failed to decode image: {file.filename}'}), 400
+            images.append(img)
+        
+        if len(images) < 2:
+            return jsonify({'success': False, 'error': 'Need at least 2 valid images to stitch'}), 400
+        
+        # Optional: resize large images for faster processing
+        max_width = request.form.get('max_width', type=int, default=2000)
+        if max_width > 0:
+            for i, img in enumerate(images):
+                if img.shape[1] > max_width:
+                    scale = max_width / img.shape[1]
+                    new_size = (max_width, int(img.shape[0] * scale))
+                    images[i] = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+        
+        # Create stitcher
+        try:
+            if hasattr(cv2, "Stitcher_create"):
+                stitcher = cv2.Stitcher_create(cv2.Stitcher_PANORAMA)
+            elif hasattr(cv2, "createStitcher"):
+                stitcher = cv2.createStitcher(cv2.Stitcher_PANORAMA)
+            else:
+                return jsonify({'success': False, 'error': 'OpenCV Stitcher API not available'}), 500
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Failed to create stitcher: {str(e)}'}), 500
+        
+        # Perform stitching
+        status, panorama = stitcher.stitch(images)
+        
+        if status != cv2.Stitcher_OK:
+            error_messages = {
+                cv2.Stitcher_ERR_NEED_MORE_IMGS: 'Not enough images or not enough keypoints found',
+                cv2.Stitcher_ERR_HOMOGESTY_EST_FAIL: 'Homography estimation failed',
+                cv2.Stitcher_ERR_CAMERA_PARAMS_ADJUST_FAIL: 'Camera parameter adjustment failed'
+            }
+            error_msg = error_messages.get(status, f'Stitching failed with status code {status}')
+            return jsonify({'success': False, 'error': error_msg}), 400
+        
+        # Encode panorama to base64
+        _, buffer = cv2.imencode('.jpg', panorama, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        panorama_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        return jsonify({
+            'success': True,
+            'panorama': f'data:image/jpeg;base64,{panorama_base64}',
+            'width': int(panorama.shape[1]),
+            'height': int(panorama.shape[0])
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()}), 500
+
 if __name__ == '__main__':
     print("=" * 60)
     print("Computer Vision Assignments - Unified Server")
