@@ -25,26 +25,82 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
 
 // Panorama Stitching Functionality
 let selectedFiles = [];
+let imageInput, selectedFilesDiv, stitchBtn, clearBtn, loadingIndicator, errorMessage, resultContainer, panoramaResult, downloadBtn;
 
-const imageInput = document.getElementById('imageInput');
-const selectedFilesDiv = document.getElementById('selectedFiles');
-const stitchBtn = document.getElementById('stitchBtn');
-const clearBtn = document.getElementById('clearBtn');
-const loadingIndicator = document.getElementById('loadingIndicator');
-const errorMessage = document.getElementById('errorMessage');
-const resultContainer = document.getElementById('resultContainer');
-const panoramaResult = document.getElementById('panoramaResult');
-const downloadBtn = document.getElementById('downloadBtn');
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', () => {
+  initializePanoramaStitching();
+});
+
+function initializePanoramaStitching() {
+  // Get all DOM elements
+  imageInput = document.getElementById('imageInput');
+  selectedFilesDiv = document.getElementById('selectedFiles');
+  stitchBtn = document.getElementById('stitchBtn');
+  clearBtn = document.getElementById('clearBtn');
+  loadingIndicator = document.getElementById('loadingIndicator');
+  errorMessage = document.getElementById('errorMessage');
+  resultContainer = document.getElementById('resultContainer');
+  panoramaResult = document.getElementById('panoramaResult');
+  downloadBtn = document.getElementById('downloadBtn');
+
+  // Check if elements exist (in case we're not on the Task 1 page)
+  if (!imageInput || !stitchBtn) {
+    console.log('Panorama stitching elements not found on this page');
+    return;
+  }
+
+  // Setup file input change handler
+  imageInput.addEventListener('change', handleFileSelection);
+  
+  // Setup file input click handlers - support both label and button
+  const fileLabel = document.querySelector('label[for="imageInput"]');
+  const selectBtn = document.getElementById('selectImagesBtn');
+  
+  if (fileLabel) {
+    fileLabel.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (imageInput) {
+        imageInput.click();
+      }
+    });
+  }
+  
+  if (selectBtn) {
+    selectBtn.addEventListener('click', () => {
+      if (imageInput) {
+        imageInput.click();
+      }
+    });
+  }
+
+  if (stitchBtn) stitchBtn.addEventListener('click', handleStitch);
+  if (clearBtn) clearBtn.addEventListener('click', handleClear);
+  if (downloadBtn) downloadBtn.addEventListener('click', handleDownload);
+  
+  console.log('Panorama stitching initialized successfully');
+}
 
 // Handle file selection
-imageInput.addEventListener('change', (e) => {
-  selectedFiles = Array.from(e.target.files);
+function handleFileSelection(e) {
+  const files = e.target.files;
+  if (!files || files.length === 0) {
+    selectedFiles = [];
+    updateSelectedFilesDisplay();
+    updateButtons();
+    return;
+  }
+  
+  selectedFiles = Array.from(files);
+  console.log(`Selected ${selectedFiles.length} file(s)`);
   updateSelectedFilesDisplay();
   updateButtons();
-});
+}
 
 // Update selected files display
 function updateSelectedFilesDisplay() {
+  if (!selectedFilesDiv) return;
+  
   if (selectedFiles.length === 0) {
     selectedFilesDiv.innerHTML = '';
     return;
@@ -67,6 +123,8 @@ function updateSelectedFilesDisplay() {
 
 // Update button states
 function updateButtons() {
+  if (!stitchBtn || !clearBtn) return;
+  
   const hasFiles = selectedFiles.length >= 2;
   stitchBtn.disabled = !hasFiles;
   clearBtn.disabled = selectedFiles.length === 0;
@@ -81,17 +139,19 @@ function updateButtons() {
 }
 
 // Clear selection
-clearBtn.addEventListener('click', () => {
+function handleClear() {
   selectedFiles = [];
-  imageInput.value = '';
+  if (imageInput) {
+    imageInput.value = '';
+  }
   updateSelectedFilesDisplay();
   updateButtons();
-  resultContainer.style.display = 'none';
-  errorMessage.style.display = 'none';
-});
+  if (resultContainer) resultContainer.style.display = 'none';
+  if (errorMessage) errorMessage.style.display = 'none';
+}
 
 // Stitch panorama
-stitchBtn.addEventListener('click', async () => {
+async function handleStitch() {
   if (selectedFiles.length < 2) {
     showError('Please select at least 2 images to stitch.');
     return;
@@ -119,23 +179,27 @@ stitchBtn.addEventListener('click', async () => {
     
     const data = await response.json();
     
-    loadingIndicator.style.display = 'none';
-    stitchBtn.disabled = false;
-    
-    if (!response.ok || !data.success) {
-      showError(data.error || 'Failed to stitch panorama. Please try again.');
-      return;
-    }
-    
-    // Display result
+  if (loadingIndicator) loadingIndicator.style.display = 'none';
+  if (stitchBtn) stitchBtn.disabled = false;
+  
+  if (!response.ok || !data.success) {
+    showError(data.error || 'Failed to stitch panorama. Please try again.');
+    return;
+  }
+  
+  // Display result
+  if (panoramaResult && data.panorama) {
     panoramaResult.src = data.panorama;
     panoramaResult.onload = () => {
-      resultContainer.style.display = 'block';
-      resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (resultContainer) {
+        resultContainer.style.display = 'block';
+        resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     };
     
     // Store panorama data for download
     panoramaResult.dataset.panoramaData = data.panorama;
+  }
     
   } catch (error) {
     loadingIndicator.style.display = 'none';
@@ -146,7 +210,8 @@ stitchBtn.addEventListener('click', async () => {
 });
 
 // Download panorama
-downloadBtn.addEventListener('click', () => {
+function handleDownload() {
+  if (!panoramaResult) return;
   const panoramaData = panoramaResult.dataset.panoramaData;
   if (!panoramaData) return;
   
@@ -156,10 +221,15 @@ downloadBtn.addEventListener('click', () => {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-});
+}
 
 // Show error message
 function showError(message) {
+  if (!errorMessage) {
+    console.error('Error:', message);
+    alert('Error: ' + message);
+    return;
+  }
   errorMessage.textContent = `❌ Error: ${message}`;
   errorMessage.style.display = 'block';
   errorMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

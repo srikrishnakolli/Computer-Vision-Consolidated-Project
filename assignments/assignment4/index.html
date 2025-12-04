@@ -80,7 +80,10 @@
           
           <div class="upload-container">
             <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
-            <button class="btn primary" onclick="document.getElementById('imageInput').click()">
+            <label for="imageInput" class="btn primary" style="cursor: pointer; display: inline-block;">
+              📸 Select Images (Multiple)
+            </label>
+            <button id="selectImagesBtn" class="btn primary" style="display: none;">
               📸 Select Images (Multiple)
             </button>
             <div id="selectedFiles" class="selected-files"></div>
