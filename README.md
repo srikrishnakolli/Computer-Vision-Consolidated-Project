@@ -2,6 +2,17 @@
 
 This repository contains all Computer Vision assignments (1-7) integrated into a single unified web application.
 
+## Video Demonstrations
+
+| Module | Description | Video Link |
+|--------|-------------|------------|
+| Module 1 | Camera Calibration & Dimension Measurement | [Watch Video](https://drive.google.com/file/d/1cvrgNp7YoITegDZFKveEFbhqQga37B3K/view?usp=sharing) |
+| Module 2 | Template Matching & Deblurring | [Watch Video](https://drive.google.com/file/d/1Jl1ZsdpUTr4e_y0h_fU3hWggZQJ8Svzi/view?usp=sharing) |
+| Module 3 | Edge Detection & ArUco Markers | [Watch Video](https://drive.google.com/file/d/10KImFDGFTNXxI9hhYvKuwYkzzq0yYj1c/view?usp=sharing) |
+| Module 4 | Panorama Stitching & SIFT | [Watch Video](https://drive.google.com/file/d/1GcjtoDagd7SZoNjO64WZmDhyupkvfuwQ/view?usp=sharing) |
+| Module 5-6 | Real-Time Object Tracking | [Watch Video](https://drive.google.com/file/d/1508xl64b-zQVvs7fHTUILZMOXWkQsLPl/view?usp=sharing) |
+| Module 7 | Stereo Vision & Pose Tracking | [Watch Video](https://drive.google.com/file/d/1XSQzozKBHpRhBBbFX98lb4JOj9nwJ05Z/view?usp=sharing) |
+
 ## Structure
 
 ```
