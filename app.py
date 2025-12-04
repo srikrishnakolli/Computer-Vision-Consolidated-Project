@@ -407,15 +407,22 @@ def stitch_panorama():
 
 # Import SIFT implementation from task2_sift.py
 try:
-    sys.path.insert(0, str(Path(__file__).parent / 'assignments' / 'assignment4'))
-    from task2_sift import (
-        SIFTFromScratch, Keypoint, Match,
-        match_descriptors, ransac_homography, draw_matches,
-        to_grayscale_float, keypoints_to_array
-    )
-    SIFT_AVAILABLE = True
+    sift_module_path = Path(__file__).parent / 'assignments' / 'assignment4'
+    if sift_module_path.exists():
+        sys.path.insert(0, str(sift_module_path))
+        from task2_sift import (
+            SIFTFromScratch, Keypoint, Match,
+            match_descriptors, ransac_homography, draw_matches,
+            to_grayscale_float, keypoints_to_array
+        )
+        SIFT_AVAILABLE = True
+    else:
+        print(f"Warning: SIFT module path not found: {sift_module_path}")
+        SIFT_AVAILABLE = False
 except ImportError as e:
     print(f"Warning: Could not import SIFT modules: {e}")
+    import traceback
+    traceback.print_exc()
     SIFT_AVAILABLE = False
 
 @app.route('/api/sift_ransac', methods=['POST'])
