@@ -174,6 +174,91 @@
       border: 1px solid rgba(245, 158, 11, 0.3);
     }
 
+    .evaluation-section {
+      margin-top: 4rem;
+      margin-bottom: 3rem;
+    }
+
+    .evaluation-section h2 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: var(--text);
+      text-align: center;
+    }
+
+    .evaluation-section .subtitle {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 1rem;
+    }
+
+    .evaluation-table-wrapper {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+
+    .evaluation-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 800px;
+    }
+
+    .evaluation-table thead {
+      background: rgba(96, 165, 250, 0.1);
+    }
+
+    .evaluation-table th {
+      padding: 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: var(--accent);
+      border-bottom: 2px solid var(--border);
+    }
+
+    .evaluation-table td {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .evaluation-table tbody tr:hover {
+      background: rgba(96, 165, 250, 0.05);
+    }
+
+    .evaluation-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .table-image {
+      width: 120px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+    }
+
+    .dimension-cell {
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+    }
+
+    .physical-dims {
+      color: var(--muted);
+    }
+
+    .measured-dims {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .object-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+
     footer {
       text-align: center;
       padding: 2rem;
@@ -188,6 +273,13 @@
       }
       .assignments-grid {
         grid-template-columns: 1fr;
+      }
+      .evaluation-table-wrapper {
+        padding: 1rem;
+      }
+      .table-image {
+        width: 80px;
+        height: 80px;
       }
     }
   </style>
@@ -313,10 +405,174 @@
     </div>
   </div>
 
+  <!-- Evaluation Data Section -->
+  <section class="evaluation-section container">
+    <h2>ROI Calculation Evaluation Results</h2>
+    <p class="subtitle">Physical vs Measured Dimensions Comparison</p>
+    <div class="evaluation-table-wrapper">
+      <table class="evaluation-table" id="evaluation-table">
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>Object Name</th>
+            <th>Physical Dimensions (mm)</th>
+            <th>Measured Dimensions (mm)</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody id="evaluation-tbody">
+          <!-- Data will be populated by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <footer>
     <p>Computer Vision Assignments - Unified Web Application</p>
     <p style="margin-top: 0.5rem; font-size: 0.9rem;">All assignments integrated into a single web application</p>
   </footer>
+
+  <script>
+    // Evaluation Data
+    const EVALUATION_DATA = [
+      {
+        "object_name": "Charger",
+        "physical_width_mm": 54,
+        "physical_height_mm": 52,
+        "measured_width_mm": 59.21,
+        "measured_height_mm": 57.50,
+        "image_path": "Assignment 1/outputs/Adapter.png",
+        "notes": ""
+      },
+      {
+        "object_name": "Vallet",
+        "physical_width_mm": 74,
+        "physical_height_mm": 102,
+        "measured_width_mm": 77.15,
+        "measured_height_mm": 104.39,
+        "image_path": "Assignment 1/outputs/Vallet.png",
+        "notes": ""
+      },
+      {
+        "object_name": "Cube",
+        "physical_width_mm": 38,
+        "physical_height_mm": 38,
+        "measured_width_mm": 41.74,
+        "measured_height_mm": 42.73,
+        "image_path": "Assignment 1/outputs/cube.png",
+        "notes": ""
+      },
+      {
+        "object_name": "Deck",
+        "physical_width_mm": 95,
+        "physical_height_mm": 122,
+        "measured_width_mm": 79.28,
+        "measured_height_mm": 102.15,
+        "image_path": "Assignment 1/outputs/deck.png",
+        "notes": ""
+      },
+      {
+        "object_name": "CardBox",
+        "physical_width_mm": 70,
+        "physical_height_mm": 100,
+        "measured_width_mm": 82.73,
+        "measured_height_mm": 114.38,
+        "image_path": "Assignment 1/outputs/cardbox.png",
+        "notes": ""
+      },
+      {
+        "object_name": "Remote",
+        "physical_width_mm": 30,
+        "physical_height_mm": 160,
+        "measured_width_mm": 38.97,
+        "measured_height_mm": 188.12,
+        "image_path": "Assignment 1/outputs/remote.png",
+        "notes": ""
+      },
+      {
+        "object_name": "Torch",
+        "physical_width_mm": 27,
+        "physical_height_mm": 98,
+        "measured_width_mm": 30.36,
+        "measured_height_mm": 99.18,
+        "image_path": "Assignment 1/outputs/torch.png",
+        "notes": ""
+      },
+      {
+        "object_name": "Buds",
+        "physical_width_mm": 50,
+        "physical_height_mm": 64,
+        "measured_width_mm": 56.49,
+        "measured_height_mm": 71.67,
+        "image_path": "Assignment 1/outputs/buds.png",
+        "notes": ""
+      },
+      {
+        "object_name": "Duster",
+        "physical_width_mm": 47,
+        "physical_height_mm": 123,
+        "measured_width_mm": 58.24,
+        "measured_height_mm": 133.35,
+        "image_path": "Assignment 1/outputs/duster.png",
+        "notes": ""
+      },
+      {
+        "object_name": "PlasticBox",
+        "physical_width_mm": 80,
+        "physical_height_mm": 83,
+        "measured_width_mm": 88.91,
+        "measured_height_mm": 88.58,
+        "image_path": "Assignment 1/outputs/plasticbox.png",
+        "notes": ""
+      }
+    ];
+
+    // Populate table
+    function populateEvaluationTable() {
+      const tbody = document.getElementById('evaluation-tbody');
+      tbody.innerHTML = '';
+
+      EVALUATION_DATA.forEach(item => {
+        // Calculate error percentage
+        const widthError = ((item.measured_width_mm - item.physical_width_mm) / item.physical_width_mm * 100).toFixed(2);
+        const heightError = ((item.measured_height_mm - item.physical_height_mm) / item.physical_height_mm * 100).toFixed(2);
+        
+        // Determine error color
+        const widthErrorAbs = Math.abs(parseFloat(widthError));
+        const heightErrorAbs = Math.abs(parseFloat(heightError));
+        const avgError = (widthErrorAbs + heightErrorAbs) / 2;
+        
+        let errorColor = '#10b981'; // green for low error
+        if (avgError > 15) errorColor = '#f59e0b'; // orange for medium error
+        if (avgError > 25) errorColor = '#ef4444'; // red for high error
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>
+            <img src="${item.image_path}" alt="${item.object_name}" class="table-image" 
+                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'120\\' height=\\'120\\'%3E%3Crect fill=\\'%23334155\\' width=\\'120\\' height=\\'120\\'/%3E%3Ctext fill=\\'%2394a3b8\\' x=\\'50%25\\' y=\\'50%25\\' text-anchor=\\'middle\\' dy=\\'.3em\\'%3ENo Image%3C/text%3E%3C/svg%3E'">
+          </td>
+          <td class="object-name">${item.object_name}</td>
+          <td class="dimension-cell physical-dims">
+            W: ${item.physical_width_mm} mm<br>
+            H: ${item.physical_height_mm} mm
+          </td>
+          <td class="dimension-cell measured-dims">
+            W: ${item.measured_width_mm} mm<br>
+            H: ${item.measured_height_mm} mm
+          </td>
+          <td class="dimension-cell" style="color: ${errorColor}">
+            W: ${widthError > 0 ? '+' : ''}${widthError}%<br>
+            H: ${heightError > 0 ? '+' : ''}${heightError}%
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Initialize table on page load
+    document.addEventListener('DOMContentLoaded', populateEvaluationTable);
+  </script>
 </body>
 </html>
 
