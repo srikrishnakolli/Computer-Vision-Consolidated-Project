@@ -5,7 +5,6 @@ Serves static files and provides backend API endpoints
 """
 
 import os
-import sys
 from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
 import cv2
@@ -14,11 +13,6 @@ import json
 import base64
 from io import BytesIO
 from PIL import Image
-import math
-import random
-import dataclasses
-from typing import List, Tuple
-from pathlib import Path
 
 # Assignment 7 backend functions (copied to avoid import issues)
 calibration_storage = {}
@@ -271,6 +265,80 @@ def measure_object_size():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# ========== Assignment 4 Backend API ==========
+
+@app.route('/api/stitch_panorama', methods=['POST'])
+def stitch_panorama():
+    """Stitch multiple images into a panorama"""
+    try:
+        if 'images' not in request.files:
+            return jsonify({'success': False, 'error': 'No images provided'}), 400
+        
+        files = request.files.getlist('images')
+        if len(files) < 2:
+            return jsonify({'success': False, 'error': 'Need at least 2 images to stitch'}), 400
+        
+        # Load images
+        images = []
+        for file in files:
+            if file.filename == '':
+                continue
+            img_bytes = file.read()
+            nparr = np.frombuffer(img_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if img is None:
+                return jsonify({'success': False, 'error': f'Failed to decode image: {file.filename}'}), 400
+            
+            # Resize if too large (max width 1800px)
+            if img.shape[1] > 1800:
+                scale = 1800 / img.shape[1]
+                new_size = (1800, int(img.shape[0] * scale))
+                img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+            
+            images.append(img)
+        
+        if len(images) < 2:
+            return jsonify({'success': False, 'error': 'Need at least 2 valid images'}), 400
+        
+        # Create stitcher
+        mode = cv2.Stitcher_PANORAMA
+        if hasattr(cv2, "Stitcher_create"):
+            stitcher = cv2.Stitcher_create(mode)
+        elif hasattr(cv2, "createStitcher"):
+            stitcher = cv2.createStitcher(mode)
+        else:
+            return jsonify({'success': False, 'error': 'OpenCV Stitcher API not available'}), 500
+        
+        # Stitch images
+        status, panorama = stitcher.stitch(images)
+        
+        if status != cv2.Stitcher_OK:
+            error_messages = {
+                cv2.Stitcher_ERR_NEED_MORE_IMGS: "Need more images (at least 2)",
+                cv2.Stitcher_ERR_HOMOGESTY_EST_FAIL: "Homography estimation failed - images may not have enough overlap",
+                cv2.Stitcher_ERR_CAMERA_PARAMS_ADJUST_FAIL: "Camera parameters adjustment failed",
+                cv2.Stitcher_ERR_MATCH_CONFIDENCE_FAIL: "Matching confidence too low - images may not overlap enough"
+            }
+            error_msg = error_messages.get(status, f"Stitching failed with status code {status}")
+            return jsonify({'success': False, 'error': error_msg}), 400
+        
+        # Convert to base64
+        success, buffer = cv2.imencode('.jpg', panorama, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        if not success:
+            return jsonify({'success': False, 'error': 'Failed to encode panorama'}), 500
+        
+        img_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        return jsonify({
+            'success': True,
+            'panorama': f'data:image/jpeg;base64,{img_base64}',
+            'width': panorama.shape[1],
+            'height': panorama.shape[0]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/detect_chessboard', methods=['POST'])
 def detect_chessboard():
     """Detect chessboard corners in stereo image pair"""
@@ -327,254 +395,6 @@ def detect_chessboard():
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-# ========== Assignment 4 Panorama Stitching API ==========
-
-@app.route('/api/stitch_panorama', methods=['POST'])
-def stitch_panorama():
-    """Stitch multiple images into a panorama"""
-    try:
-        if 'images' not in request.files:
-            return jsonify({'success': False, 'error': 'No images provided'}), 400
-        
-        files = request.files.getlist('images')
-        if len(files) < 2:
-            return jsonify({'success': False, 'error': 'Need at least 2 images to stitch'}), 400
-        
-        # Read and decode images
-        images = []
-        for file in files:
-            if file.filename == '':
-                continue
-            file_bytes = file.read()
-            nparr = np.frombuffer(file_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            if img is None:
-                return jsonify({'success': False, 'error': f'Failed to decode image: {file.filename}'}), 400
-            images.append(img)
-        
-        if len(images) < 2:
-            return jsonify({'success': False, 'error': 'Need at least 2 valid images to stitch'}), 400
-        
-        # Optional: resize large images for faster processing
-        max_width = request.form.get('max_width', type=int, default=2000)
-        if max_width > 0:
-            for i, img in enumerate(images):
-                if img.shape[1] > max_width:
-                    scale = max_width / img.shape[1]
-                    new_size = (max_width, int(img.shape[0] * scale))
-                    images[i] = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
-        
-        # Create stitcher
-        try:
-            if hasattr(cv2, "Stitcher_create"):
-                stitcher = cv2.Stitcher_create(cv2.Stitcher_PANORAMA)
-            elif hasattr(cv2, "createStitcher"):
-                stitcher = cv2.createStitcher(cv2.Stitcher_PANORAMA)
-            else:
-                return jsonify({'success': False, 'error': 'OpenCV Stitcher API not available'}), 500
-        except Exception as e:
-            return jsonify({'success': False, 'error': f'Failed to create stitcher: {str(e)}'}), 500
-        
-        # Perform stitching
-        status, panorama = stitcher.stitch(images)
-        
-        if status != cv2.Stitcher_OK:
-            error_messages = {
-                cv2.Stitcher_ERR_NEED_MORE_IMGS: 'Not enough images or not enough keypoints found',
-                cv2.Stitcher_ERR_HOMOGESTY_EST_FAIL: 'Homography estimation failed',
-                cv2.Stitcher_ERR_CAMERA_PARAMS_ADJUST_FAIL: 'Camera parameter adjustment failed'
-            }
-            error_msg = error_messages.get(status, f'Stitching failed with status code {status}')
-            return jsonify({'success': False, 'error': error_msg}), 400
-        
-        # Encode panorama to base64
-        _, buffer = cv2.imencode('.jpg', panorama, [cv2.IMWRITE_JPEG_QUALITY, 95])
-        panorama_base64 = base64.b64encode(buffer).decode('utf-8')
-        
-        return jsonify({
-            'success': True,
-            'panorama': f'data:image/jpeg;base64,{panorama_base64}',
-            'width': int(panorama.shape[1]),
-            'height': int(panorama.shape[0])
-        })
-        
-    except Exception as e:
-        import traceback
-        return jsonify({'success': False, 'error': str(e), 'traceback': traceback.format_exc()}), 500
-
-# ========== Assignment 4 Task 2: SIFT + RANSAC API ==========
-
-# Import SIFT implementation from task2_sift.py
-try:
-    sift_module_path = Path(__file__).parent / 'assignments' / 'assignment4'
-    if sift_module_path.exists():
-        sys.path.insert(0, str(sift_module_path))
-        from task2_sift import (
-            SIFTFromScratch, Keypoint, Match,
-            match_descriptors, ransac_homography, draw_matches,
-            to_grayscale_float, keypoints_to_array
-        )
-        SIFT_AVAILABLE = True
-    else:
-        print(f"Warning: SIFT module path not found: {sift_module_path}")
-        SIFT_AVAILABLE = False
-except ImportError as e:
-    print(f"Warning: Could not import SIFT modules: {e}")
-    import traceback
-    traceback.print_exc()
-    SIFT_AVAILABLE = False
-
-@app.route('/api/sift_ransac', methods=['POST'])
-def sift_ransac():
-    """Perform SIFT feature matching and RANSAC homography estimation"""
-    if not SIFT_AVAILABLE:
-        return jsonify({'success': False, 'error': 'SIFT implementation not available'}), 500
-    
-    try:
-        if 'image_a' not in request.files or 'image_b' not in request.files:
-            return jsonify({'success': False, 'error': 'Need two images: image_a and image_b'}), 400
-        
-        file_a = request.files['image_a']
-        file_b = request.files['image_b']
-        
-        # Get optional parameters
-        resize_width = request.form.get('resize_width', type=int, default=960)
-        octaves = request.form.get('octaves', type=int, default=4)
-        scales = request.form.get('scales', type=int, default=3)
-        ratio_test = request.form.get('ratio_test', type=float, default=0.75)
-        ransac_iters = request.form.get('ransac_iters', type=int, default=2000)
-        ransac_threshold = request.form.get('ransac_threshold', type=float, default=3.0)
-        
-        # Read images
-        file_a_bytes = file_a.read()
-        file_b_bytes = file_b.read()
-        
-        nparr_a = np.frombuffer(file_a_bytes, np.uint8)
-        nparr_b = np.frombuffer(file_b_bytes, np.uint8)
-        
-        img_a = cv2.imdecode(nparr_a, cv2.IMREAD_COLOR)
-        img_b = cv2.imdecode(nparr_b, cv2.IMREAD_COLOR)
-        
-        if img_a is None or img_b is None:
-            return jsonify({'success': False, 'error': 'Failed to decode one or both images'}), 400
-        
-        # Resize if needed
-        if resize_width > 0:
-            for img in [img_a, img_b]:
-                if img.shape[1] > resize_width:
-                    scale = resize_width / img.shape[1]
-                    new_size = (resize_width, int(img.shape[0] * scale))
-                    img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
-        
-        # Convert to grayscale float
-        gray_a = to_grayscale_float(img_a)
-        gray_b = to_grayscale_float(img_b)
-        
-        # Run custom SIFT
-        siftr = SIFTFromScratch(
-            num_octaves=octaves,
-            num_scales=scales,
-            sigma=1.6,
-            contrast_threshold=0.04,
-            edge_threshold=10.0,
-        )
-        
-        custom_kp_a, custom_desc_a = siftr.detect_and_compute(gray_a)
-        custom_kp_b, custom_desc_b = siftr.detect_and_compute(gray_b)
-        
-        # Match descriptors
-        custom_matches = match_descriptors(custom_desc_a, custom_desc_b, ratio_test)
-        
-        if len(custom_matches) < 4:
-            return jsonify({
-                'success': False,
-                'error': f'Not enough matches found: {len(custom_matches)}. Need at least 4 matches for RANSAC.'
-            }), 400
-        
-        # RANSAC
-        custom_pts_a = keypoints_to_array(custom_kp_a)
-        custom_pts_b = keypoints_to_array(custom_kp_b)
-        custom_H, custom_inliers = ransac_homography(
-            custom_pts_a, custom_pts_b, custom_matches, ransac_iters, ransac_threshold
-        )
-        
-        # OpenCV SIFT for comparison
-        reference = cv2.SIFT_create()
-        ref_kp_a, ref_desc_a = reference.detectAndCompute((gray_a * 255).astype(np.uint8), None)
-        ref_kp_b, ref_desc_b = reference.detectAndCompute((gray_b * 255).astype(np.uint8), None)
-        
-        bf = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
-        ref_matches_knn = bf.knnMatch(ref_desc_a, ref_desc_b, k=2)
-        ref_matches = []
-        for m, n in ref_matches_knn:
-            if m.distance < ratio_test * n.distance:
-                ref_matches.append(m)
-        
-        ref_pts_a = np.array([kp.pt for kp in ref_kp_a], dtype=np.float32)
-        ref_pts_b = np.array([kp.pt for kp in ref_kp_b], dtype=np.float32)
-        ref_H, ref_inliers = ransac_homography(
-            ref_pts_a, ref_pts_b, ref_matches, ransac_iters, ransac_threshold
-        )
-        
-        # Draw matches (limit to 80 for visualization)
-        custom_vis = None
-        ref_vis = None
-        
-        if custom_inliers and len(custom_inliers) > 0:
-            custom_vis = draw_matches(
-                img_a, img_b,
-                [(kp.x, kp.y) for kp in custom_kp_a],
-                [(kp.x, kp.y) for kp in custom_kp_b],
-                custom_matches,
-                custom_inliers[:80]
-            )
-        
-        if ref_inliers and len(ref_inliers) > 0:
-            ref_vis = draw_matches(
-                img_a, img_b,
-                [kp.pt for kp in ref_kp_a],
-                [kp.pt for kp in ref_kp_b],
-                ref_matches,
-                ref_inliers[:80]
-            )
-        
-        # Encode visualization images to base64
-        result = {
-            'success': True,
-            'custom': {
-                'keypoints_a': len(custom_kp_a),
-                'keypoints_b': len(custom_kp_b),
-                'matches': len(custom_matches),
-                'inliers': len(custom_inliers),
-                'homography': custom_H.tolist() if custom_H is not None else None
-            },
-            'opencv': {
-                'keypoints_a': len(ref_kp_a),
-                'keypoints_b': len(ref_kp_b),
-                'matches': len(ref_matches),
-                'inliers': len(ref_inliers),
-                'homography': ref_H.tolist() if ref_H is not None else None
-            }
-        }
-        
-        if custom_vis is not None:
-            _, buffer = cv2.imencode('.jpg', custom_vis, [cv2.IMWRITE_JPEG_QUALITY, 95])
-            result['custom']['matches_image'] = f'data:image/jpeg;base64,{base64.b64encode(buffer).decode("utf-8")}'
-        
-        if ref_vis is not None:
-            _, buffer = cv2.imencode('.jpg', ref_vis, [cv2.IMWRITE_JPEG_QUALITY, 95])
-            result['opencv']['matches_image'] = f'data:image/jpeg;base64,{base64.b64encode(buffer).decode("utf-8")}'
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
 
 if __name__ == '__main__':
     print("=" * 60)

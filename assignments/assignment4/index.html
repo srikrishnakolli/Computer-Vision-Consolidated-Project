@@ -61,78 +61,65 @@
         <div class="section-header">
           <div>
             <p class="eyebrow">Task 1</p>
-            <h2>Panorama Stitching (Web Interface)</h2>
+            <h2>Panorama Stitching</h2>
           </div>
           <div class="tags">
             <span class="tag">OpenCV Stitcher</span>
-            <span class="tag">Real-time Processing</span>
-            <span class="tag">Web-based</span>
+            <span class="tag">Web Interface</span>
+            <span class="tag">Interactive</span>
           </div>
         </div>
         
-        <!-- Web-based Panorama Stitching Interface -->
-        <div class="panorama-upload-section">
-          <h3>Upload Images for Stitching</h3>
-          <p>
-            Select multiple images (2 or more) with 40&ndash;60% overlap to create a panorama.
-            Images should be in order (left to right or right to left).
-          </p>
-          
-          <div class="upload-container">
-            <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
-            <label for="imageInput" class="btn primary" style="cursor: pointer; display: inline-block;">
-              📸 Select Images (Multiple)
+        <!-- Web Interface for Stitching -->
+        <div class="stitch-interface">
+          <div class="upload-section">
+            <label for="image-upload" class="upload-label">
+              <input type="file" id="image-upload" multiple accept="image/*" style="display: none;">
+              <div class="upload-box">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p><strong>Select Multiple Images</strong></p>
+                <p style="color: var(--muted); font-size: 0.9rem;">Choose 2 or more overlapping images (40-60% overlap recommended)</p>
+              </div>
             </label>
-            <button id="selectImagesBtn" class="btn primary" style="display: none;">
-              📸 Select Images (Multiple)
-            </button>
-            <div id="selectedFiles" class="selected-files"></div>
-          </div>
-          
-          <div class="action-buttons">
-            <button id="stitchBtn" class="btn primary" disabled style="margin-top: 1rem;">
-              🖼️ Stitch Panorama
-            </button>
-            <button id="clearBtn" class="btn ghost" disabled style="margin-top: 1rem; margin-left: 0.5rem;">
-              Clear Selection
+            
+            <div id="selected-images" class="selected-images"></div>
+            
+            <button id="stitch-btn" class="btn primary" style="width: 100%; margin-top: 1rem;" disabled>
+              Stitch Images
             </button>
           </div>
           
-          <div id="loadingIndicator" class="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>Stitching panorama... This may take a moment.</p>
+          <div id="result-section" class="result-section" style="display: none;">
+            <h3>Stitched Panorama</h3>
+            <div id="panorama-container"></div>
+            <button id="download-btn" class="btn ghost" style="margin-top: 1rem;">Download Panorama</button>
           </div>
           
-          <div id="errorMessage" class="error-message" style="display: none;"></div>
-          
-          <div id="resultContainer" class="result-container" style="display: none;">
-            <h3>Stitched Panorama Result</h3>
-            <div class="panorama-display">
-              <img id="panoramaResult" alt="Stitched panorama" />
-            </div>
-            <button id="downloadBtn" class="btn primary" style="margin-top: 1rem;">
-              💾 Download Panorama
-            </button>
+          <div id="error-message" class="error-message" style="display: none;"></div>
+          <div id="loading" class="loading" style="display: none;">
+            <p>Stitching images... This may take a moment.</p>
           </div>
         </div>
         
-        <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);">
-        
-        <h3 style="margin-top: 2rem;">CLI Method (Alternative)</h3>
-        <p>
-          Alternatively, you can run the command below to stitch the bundled captures or replace the
-          <code>--images</code> folder with your own photos (ensure 40&ndash;60% overlap
-          and ordered sweep).
-        </p>
-        <div class="command">
-          <pre><code id="cmd-task1">python task1_stitch.py \
+        <details style="margin-top: 2rem;">
+          <summary>CLI Usage (Alternative)</summary>
+          <p>
+            You can also use the command-line interface:
+          </p>
+          <div class="command">
+            <pre><code id="cmd-task1">python task1_stitch.py \
   --images ./images \
   --pattern "*.JPG" \
   --output ./output/task1_panorama1.jpg \
   --reference ./comparisons/mobi_panaroma.JPG \
   --comparison-output ./output/task1_vs_mobi.jpg</code></pre>
-          <button class="btn copy" data-copy="#cmd-task1">Copy</button>
-        </div>
+            <button class="btn copy" data-copy="#cmd-task1">Copy</button>
+          </div>
+        </details>
         <div class="gallery">
           <figure>
             <img src="images/IMG_02.JPG" alt="Input capture" />
@@ -170,7 +157,7 @@
         <div class="section-header">
           <div>
             <p class="eyebrow">Task 2</p>
-            <h2>SIFT from Scratch + RANSAC (Web Interface)</h2>
+            <h2>SIFT from Scratch + RANSAC</h2>
           </div>
           <div class="tags">
             <span class="tag">Gaussian Pyramid</span>
@@ -178,84 +165,10 @@
             <span class="tag">RANSAC</span>
           </div>
         </div>
-        
-        <!-- Web-based SIFT + RANSAC Interface -->
-        <div class="panorama-upload-section">
-          <h3>SIFT Matching with Task 1 Images</h3>
-          <p>
-            Use images from Task 1 above, or upload new images. Select two overlapping images to perform SIFT feature extraction, descriptor matching,
-            and RANSAC-based homography estimation. Both custom SIFT implementation and OpenCV's
-            SIFT are compared.
-          </p>
-          
-          <div id="task1ImagesSelector" style="display: none; margin-bottom: 1rem; padding: 1rem; background: #eef1ff; border-radius: 12px;">
-            <strong>Use images from Task 1:</strong>
-            <div id="task1ImagesList" style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
-          </div>
-          
-          <div class="upload-container">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-              <div>
-                <label for="siftImageA" class="btn primary" style="cursor: pointer; display: inline-block; width: 100%; text-align: center;">
-                  📸 Select Image A
-                </label>
-                <input type="file" id="siftImageA" accept="image/*" style="display: none;">
-                <div id="selectedImageA" class="selected-files" style="margin-top: 0.5rem; min-height: 40px;"></div>
-              </div>
-              <div>
-                <label for="siftImageB" class="btn primary" style="cursor: pointer; display: inline-block; width: 100%; text-align: center;">
-                  📸 Select Image B
-                </label>
-                <input type="file" id="siftImageB" accept="image/*" style="display: none;">
-                <div id="selectedImageB" class="selected-files" style="margin-top: 0.5rem; min-height: 40px;"></div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="action-buttons">
-            <button id="siftProcessBtn" class="btn primary" disabled style="margin-top: 1rem;">
-              🔍 Process SIFT + RANSAC
-            </button>
-            <button id="siftClearBtn" class="btn ghost" disabled style="margin-top: 1rem; margin-left: 0.5rem;">
-              Clear Selection
-            </button>
-          </div>
-          
-          <div id="siftLoadingIndicator" class="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>Processing SIFT features and RANSAC... This may take a minute.</p>
-          </div>
-          
-          <div id="siftErrorMessage" class="error-message" style="display: none;"></div>
-          
-          <div id="siftResultContainer" class="result-container" style="display: none;">
-            <h3>SIFT + RANSAC Results</h3>
-            
-            <div class="sift-results-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0;">
-              <div class="sift-result-box">
-                <h4>Custom SIFT Implementation</h4>
-                <div id="customSiftStats" class="sift-stats"></div>
-                <div class="panorama-display">
-                  <img id="customSiftImage" alt="Custom SIFT matches" />
-                </div>
-              </div>
-              <div class="sift-result-box">
-                <h4>OpenCV SIFT (Reference)</h4>
-                <div id="opencvSiftStats" class="sift-stats"></div>
-                <div class="panorama-display">
-                  <img id="opencvSiftImage" alt="OpenCV SIFT matches" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <hr style="margin: 2rem 0; border: none; border-top: 1px solid var(--border);">
-        
-        <h3 style="margin-top: 2rem;">CLI Method (Alternative)</h3>
         <p>
-          Alternatively, you can run the script below to produce both the scratch results and the OpenCV baseline.
-          Artefacts are stored in <code>./output/task2/</code> for inclusion in the final report.
+          The script below produces both the scratch results and the OpenCV baseline.
+          Artefacts are stored in <code>./output/task2/</code> for inclusion in the final
+          report.
         </p>
         <div class="command">
           <pre><code id="cmd-task2">python task2_sift.py \
